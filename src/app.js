@@ -1,8 +1,10 @@
 import {
-  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, chooseDialogue, TOMMY_OPTIONS,
+  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, chooseDialogue, TOMMY_OPTIONS,
   ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
 } from "./engine.js";
 import { drawChapter2 } from "./chapter2-art.js";
+import { drawAgencyChapter } from "./chapter3-art.js";
+import { BOARD_OPTIONS, adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice } from "./chapter3.js";
 
 const $ = id => document.getElementById(id);
 const canvas = $("scene");
@@ -22,7 +24,17 @@ const names = {
   "lounge-match": "Red-door connection", "bouncer-recognition": "Bouncer recognizes Vincent",
   "tommy-testimony": "Tommy saw the woman", "kingfisher-lead": "The Kingfisher",
   "lighter-initials": "T.T. initials", "jazz-warning": "The woman in blue",
-  "kingfisher-whisper": "The Kingfisher warning"
+  "kingfisher-whisper": "The Kingfisher warning",
+  "case-notebook": "Vincent's notebook", "gala-photo": "Eleanor's gala photo",
+  "diary-page": "Eleanor's diary", "remittance": "Ashworth receipt",
+  "case-file": "Eleanor case file",
+  "safe-nine": "Clock: nine", "safe-six": "Calendar: June", "safe-three": "Photograph: three",
+  "agency-case": "Ashworth appointment", "engagement-photo": "Eleanor and Webb",
+  "job-offer": "The job offer", "coerced-engagement": "Forced engagement",
+  "ashworth-payment": "Ashworth funds", "safe-open": "Safe solved",
+  "webb-engagement": "Webb and Eleanor", "webb-finances": "Webb money trail",
+  "board-eleanor": "Eleanor link", "board-kingfisher": "Kingfisher link",
+  "board-webb": "Webb link", "police-bulletin": "Police dispatch", "vera-call": "Vera's call"
 };
 const descriptions = {
   body: "Gunshot wound, unknown victim", identity: "Private investigator's license: Vincent Morrow",
@@ -37,7 +49,23 @@ const descriptions = {
   "kingfisher-lead": "Kingfisher is connected to Ashworth money",
   "lighter-initials": "Silver lighter engraved T.T.",
   "jazz-warning": "Tommy warned Vincent about the woman in blue",
-  "kingfisher-whisper": "A remembered bribe, a violent threat, and the name Kingfisher"
+  "kingfisher-whisper": "A remembered bribe, a violent threat, and the name Kingfisher",
+  "safe-nine": "Clock stopped at nine. Last digit for the hidden safe.",
+  "safe-six": "June, the sixth month. Middle digit for the hidden safe.",
+  "safe-three": "Three red ribbons in Eleanor's portrait. First safe digit.",
+  "agency-case": "Vincent's handwritten Ashworth appointment",
+  "engagement-photo": "Eleanor pictured reluctantly beside Marcus Webb",
+  "job-offer": "A father begged Vincent to find his daughter",
+  "coerced-engagement": "Eleanor: 'I'd rather die than marry Marcus Webb'",
+  "ashworth-payment": "Suspicious payment from Ashworth Industries",
+  "safe-open": "Wall safe opened by 3–6–9",
+  "webb-engagement": "Webb coerced Eleanor into engagement",
+  "webb-finances": "Webb tied to Ashworth Industries shell accounts",
+  "board-eleanor": "Eleanor is the missing woman in the paper",
+  "board-kingfisher": "Tommy's testimony connects to Kingfisher",
+  "board-webb": "Webb, Kingfisher and Ashworth money overlap",
+  "police-bulletin": "Police seek Vincent for the Marmont shooting",
+  "vera-call": "Vera requests a midnight meeting at Ashworth Manor"
 };
 const zones = {
   bathroom: [
@@ -70,7 +98,20 @@ const zones = {
     ["bar", 106, 141, 135, 59], ["tommy", 154, 79, 42, 93],
     ["telephone", 215, 122, 25, 27], ["lighter", 159, 146, 33, 17]
   ],
-  agency: [["sign", 59, 34, 209, 52], ["door", 116, 78, 99, 118]]
+  agency: [["sign", 59, 34, 209, 52], ["door", 116, 78, 99, 118]],
+  office: [
+    ["board",92,19,126,98],["desk",55,129,155,69],
+    ["drawer",94,148,69,23],["notebook",148,128,36,20],
+    ["photograph",98,142,27,25],["safe",212,68,63,62],
+    ["clock",237,22,37,38],["radio",22,114,30,25],
+    ["telephone",178,108,35,34],["archive",275,16,45,144],
+    ["door",0,39,15,142],["floor",20,175,300,25]
+  ],
+  archive: [
+    ["cabinet",25,20,106,140],["calendar",169,26,83,73],
+    ["diary",184,118,40,23],["receipt",230,119,40,22],
+    ["lamp",251,45,52,87],["exit",296,16,24,184]
+  ]
 };
 const palette = {
   bg: "#0b0e1c", tile: "#282735", gold: "#c6a976", blue: "#66858f",
@@ -226,7 +267,7 @@ function drawAlley() {
   for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
 }
 function drawRain() {
-  if(state.room==="bathroom"||state.room==="suite"||state.room==="lounge")return;
+  if(["bathroom","suite","lounge","office","archive"].includes(state.room))return;
   for(let i=0;i<47;i++){
     const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
     line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
@@ -239,6 +280,7 @@ function drawScene(){
   else if(room==="suite")drawSuite();
   else if(room==="escape")drawEscape();
   else if(room==="alley")drawAlley();
+  else if(room==="office"||room==="archive")drawAgencyChapter(ctx,state,frame);
   else drawChapter2(ctx,state,frame);
   drawRain();
   // cinematic pixel border
@@ -252,9 +294,9 @@ function drawScene(){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
     textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
   }
-  if(state.status==="chapter2complete") {
+  if(state.status==="chapter2complete"||state.status==="chapter3complete"){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
-    textAt("CHAPTER 2 COMPLETE",62,40,"#f2d092",12);
+    textAt(state.status==="chapter3complete"?"CHAPTER 3 COMPLETE":"CHAPTER 2 COMPLETE",62,40,"#f2d092",12);
   }
 }
 function makeButton(text, onClick, attrs={}){
@@ -278,25 +320,31 @@ function render(){
   $("filmStamp").textContent={
     bathroom:"CHICAGO / 2:13 AM",suite:"ROOM 214 / 2:19 AM",
     escape:"FIRE ESCAPE / 2:23 AM",alley:"CHICAGO / 2:27 AM",
-    street:"CHICAGO / 2:34 AM",lounge:"THE CRIMSON LOUNGE / 2:41 AM",agency:"WEST LAKE ST / 3:02 AM"
+    street:"CHICAGO / 2:34 AM",lounge:"THE CRIMSON LOUNGE / 2:41 AM",agency:"WEST LAKE ST / 3:02 AM",
+    office:"MORROW AGENCY / 3:09 AM",archive:"RECORDS ROOM / 3:16 AM"
   }[state.room];
   $("objective").textContent=state.status==="caught"?"CASE STATUS: ARRESTED":
     state.status==="escaped"?"CHAPTER COMPLETE: CONTINUE BELOW":
     state.status==="chapter2complete"?"CHAPTER COMPLETE: THE AGENCY AWAITS":
+    state.status==="chapter3complete"?"CHAPTER COMPLETE: ASHWORTH MANOR AT MIDNIGHT":
     ({bathroom:"OBJECTIVE: RECOVER YOUR IDENTITY",suite:"OBJECTIVE: FIND CLUES AND ESCAPE",
     escape:"OBJECTIVE: DESCEND TO THE ALLEY",alley:"OBJECTIVE: REACH THE CRIMSON LOUNGE",
     street:state.inventory.includes("lighter")?"OBJECTIVE: FIND THE DETECTIVE AGENCY":"OBJECTIVE: ENTER THE CRIMSON LOUNGE",
-    lounge:"OBJECTIVE: QUESTION TOMMY TWO-FINGERS",agency:"CASE STATUS: NEXT CHAPTER"}[state.room]);
+    lounge:"OBJECTIVE: QUESTION TOMMY TWO-FINGERS",agency:"CASE STATUS: NEXT CHAPTER",
+    office:state.case3?.boardSolved?"OBJECTIVE: ANSWER THE TELEPHONE":"OBJECTIVE: SOLVE THE EVIDENCE BOARD",
+    archive:"OBJECTIVE: SEARCH THE ASHWORTH RECORDS"}[state.room]);
   $("policeStatus").textContent=state.status==="caught"?"POLICE: HERE":
-    state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
+    state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
     state.pressure>=25?"POLICE: AT THE DOOR":state.pressure>=17?"POLICE: APPROACHING":
     state.pressure>=9?"POLICE: SIRENS":"POLICE: DISTANT";
   $("storyMode").checked=state.storyMode;
   $("continueBtn").hidden=!(state.status==="escaped"&&state.room==="alley"&&state.chapter===1);
+  $("continueAgencyBtn").hidden=!(state.status==="chapter2complete"&&state.room==="agency"&&state.chapter===2);
   const verbs=$("verbs");verbs.replaceChildren();
   VERBS.forEach((v,i)=>verbs.appendChild(makeButton((i+1)+". "+v,()=>{verb=v;if(v!=="USE")item="";render();},{"aria-pressed":String(verb===v)})));
   $("commandTip").textContent=state.status==="escaped"?"Chapter 1 complete. Use CONTINUE TO CHAPTER 2 below.":
-    state.status==="chapter2complete"?"Chapter 2 complete. Your case file is saved for the next chapter.":
+    state.status==="chapter2complete"?"Chapter 2 complete. Continue to the agency from the CASE CONTROLS.":
+    state.status==="chapter3complete"?"Chapter 3 complete. Ashworth Manor will follow in the next update.":
     state.status!=="playing"?"Case closed. NEW CASE begins again.":
     verb==="USE"?(item?"USE "+(names[item]||item)+" ON WHAT?":"Choose an inventory item, then choose the target."):
     verb==="TALK"?"Select someone to question. Tommy has a lot to explain.":
@@ -329,7 +377,12 @@ function render(){
   const choices=$("choicePanel");choices.replaceChildren();
   const crimeChoice=state.room==="suite"&&state.flags.body&&!state.flags.evidenceChoice&&state.status==="playing";
   const tommyChoice=state.room==="lounge"&&state.dialogue==="tommy"&&state.status==="playing";
-  choices.hidden=!(crimeChoice||tommyChoice);
+  const c=state.case3;
+  const agencyPlaying=state.chapter===3&&state.room==="office"&&state.status==="playing";
+  const safePanel=agencyPlaying&&c?.safeExamined&&!c.safeOpen;
+  const boardPanel=agencyPlaying&&c?.boardExamined&&!c.boardSolved;
+  const safeFilePanel=agencyPlaying&&c?.safeOpen&&!c.fileTaken;
+  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel);
   if(crimeChoice){
     const strong=document.createElement("strong");strong.textContent="A CHOICE: WHAT DO YOU DO WITH THE CRIME SCENE?";choices.appendChild(strong);
     choices.appendChild(makeButton("PRESERVE EVIDENCE",()=>{state=chooseEvidence(state,"preserve");commit();}));
@@ -340,6 +393,35 @@ function render(){
     TOMMY_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
       state=chooseDialogue(state,option.id);commit();
     })));
+  }
+  if(safePanel){
+    const strong=document.createElement("strong");strong.textContent="HIDDEN SAFE / PORTRAIT • DATE • HOUR";choices.appendChild(strong);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Look at the photograph, the June calendar, and the stopped clock to uncover the three digits.";
+    choices.appendChild(hint);
+    const dials=document.createElement("div");dials.className="safe-dials";
+    ["PORTRAIT","DATE","HOUR"].forEach((label,i)=>{
+      const col=document.createElement("div");col.className="safe-dial";
+      const heading=document.createElement("span");heading.textContent=label;col.appendChild(heading);
+      col.appendChild(makeButton("▲",()=>{state=adjustAgencyDial(state,i,1);commit();},{"aria-label":"Increase "+label+" dial"}));
+      const digit=document.createElement("output");digit.textContent=String(c.safeDigits[i]);col.appendChild(digit);
+      col.appendChild(makeButton("▼",()=>{state=adjustAgencyDial(state,i,-1);commit();},{"aria-label":"Decrease "+label+" dial"}));
+      dials.appendChild(col);
+    });
+    choices.appendChild(dials);
+    choices.appendChild(makeButton("TRY COMBINATION",()=>{state=submitAgencySafe(state);commit();}));
+  }
+  if(safeFilePanel){
+    const strong=document.createElement("strong");strong.textContent="INSIDE THE SAFE: ELEANOR ASHWORTH / CONFIDENTIAL";choices.appendChild(strong);
+    choices.appendChild(makeButton("TAKE CASE FILE",()=>{state=collectAgencyFile(state);commit();}));
+  }
+  if(boardPanel){
+    const strong=document.createElement("strong");strong.textContent="EVIDENCE BOARD / "+c.boardLinks.length+" OF 3 CONNECTIONS";choices.appendChild(strong);
+    BOARD_OPTIONS.forEach(option=>{
+      const btn=makeButton((c.boardLinks.includes(option.id)?"✓ ":"")+option.label,()=>{state=agencyBoardChoice(state,option.id);commit();});
+      btn.disabled=c.boardLinks.includes(option.id);
+      choices.appendChild(btn);
+    });
   }
   drawScene();
 }
@@ -366,6 +448,7 @@ document.addEventListener("keydown",e=>{
 });
 $("storyMode").addEventListener("change",e=>{state=setStoryMode(state,e.target.checked);commit();});
 $("continueBtn").addEventListener("click",()=>{state=continueCase(state);verb="LOOK";item="";commit();});
+$("continueAgencyBtn").addEventListener("click",()=>{state=continueAgencyCase(state);verb="LOOK";item="";commit();});
 $("restartBtn").addEventListener("click",()=>{
   if(!window.confirm("Start a new case? The current auto-save will be replaced. Export first if you want to keep it."))return;
   state=initialState();verb="LOOK";item="";$("fileMessage").textContent="Fresh case opened.";commit();
@@ -373,7 +456,7 @@ $("restartBtn").addEventListener("click",()=>{
 $("exportBtn").addEventListener("click",()=>{
   const content=JSON.stringify(state,null,2);
   const url=URL.createObjectURL(new Blob([content],{type:"application/json"}));
-  const a=document.createElement("a");a.href=url;a.download="blackout-case-v2.json";
+  const a=document.createElement("a");a.href=url;a.download="blackout-case-v3.json";
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
   $("fileMessage").textContent="Case file exported. You can restore it later.";
 });
