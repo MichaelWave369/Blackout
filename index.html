@@ -8,6 +8,7 @@
   <title>BLACKOUT | Blood on the Mirror</title>
   <link rel="stylesheet" href="./styles.css">
   <script type="module" src="./src/app.js"></script>
+  <script type="module">if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});</script>
 </head>
 <body>
   <a class="skip" href="#sceneObjects">Skip to scene objects</a>
