@@ -2,8 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   initialState, act, chooseEvidence, setStoryMode, validateSave, visibleTargets, SAVE_VERSION,
-  continueCase, chooseDialogue, TOMMY_OPTIONS
+  continueCase, continueAgencyCase, chooseDialogue, TOMMY_OPTIONS
 } from "../src/engine.js";
+import { adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice, BOARD_OPTIONS } from "../src/chapter3.js";
 function step(state,verb,target,item="") { return act(state,verb,target,item); }
 function reachSuite(){
   let s=initialState();return step(s,"GO","door");
@@ -150,14 +151,14 @@ test("bullying Tommy costs trust, reassurance can repair the interview",()=>{
   s=chooseDialogue(s,"reassure");
   assert.equal(s.rapport,n,"reassurance cannot be farmed indefinitely");
 });
-test("v1 local and exported case files migrate to version two without erasing clues",()=>{
+test("v1 local and exported case files migrate to current version without erasing clues",()=>{
   let old=reachStreet();
   old.status="escaped";old.room="alley";old.version=1;
   delete old.chapter;delete old.rapport;delete old.dialogue;
   old.flags={mirror:true,body:true,identity:true,window:true,memory:true,evidenceChoice:"preserve"};
   old.inventory.push("matchbook");
   const migrated=validateSave(old);
-  assert.equal(migrated.version,2);
+  assert.equal(migrated.version,SAVE_VERSION);
   assert.equal(migrated.chapter,1);
   assert.equal(migrated.flags.evidenceChoice,"preserve");
   assert.equal(continueCase(migrated).chapter,2);
@@ -176,4 +177,140 @@ test("chapter two continuation cannot be used before escape or after starting",(
   assert.equal(early.room,"bathroom");
   const after=reachStreet();
   assert.equal(continueCase(after).room,"street");
+});
+
+function reachAgency(){
+  let s=reachStreet();
+  s=step(s,"GO","door");
+  s=step(s,"TALK","tommy");
+  s=chooseDialogue(s,"last-night");
+  s=chooseDialogue(s,"kingfisher");
+  s=step(s,"TAKE","lighter");
+  s=step(s,"GO","exit");
+  s=step(s,"GO","agency");
+  assert.equal(s.status,"chapter2complete");
+  s=continueAgencyCase(s);
+  assert.equal(s.status,"playing");
+  assert.equal(s.room,"office");
+  return s;
+}
+function dialTo(s,arr) {
+  s=step(s,"LOOK","safe");
+  for(let i=0;i<3;i++)for(let j=0;j<arr[i];j++)s=adjustAgencyDial(s,i,1);
+  return s;
+}
+test("chapter two completion continues into The Agency with evidence intact",()=>{
+  const s=reachAgency();
+  assert.equal(s.chapter,3);assert.equal(s.status,"playing");
+  assert.ok(s.inventory.includes("lighter"));
+  assert.ok(s.clues.includes("kingfisher-lead"));
+  assert.ok(s.case3&&!s.case3.safeOpen);
+  assert.equal(continueAgencyCase(s).room,"office","cannot replay transition");
+});
+test("the office has an evidence board, desk discoveries and a records room",()=>{
+  let s=reachAgency();
+  const targets=visibleTargets(s).map(([id])=>id);
+  assert.ok(targets.includes("board")&&targets.includes("desk")&&targets.includes("safe"));
+  assert.ok(!targets.includes("photograph"));
+  s=step(s,"OPEN","desk");
+  assert.ok(visibleTargets(s).some(([id])=>id==="notebook"));
+  s=step(s,"TAKE","notebook");
+  assert.ok(s.inventory.includes("case-notebook"));
+  s=step(s,"OPEN","drawer");s=step(s,"LOOK","photograph");s=step(s,"TAKE","photograph");
+  assert.ok(s.clues.includes("safe-three"));
+  assert.ok(s.memories.includes("job-offer"));
+  assert.ok(s.inventory.includes("gala-photo"));
+  s=step(s,"LOOK","clock");assert.ok(s.clues.includes("safe-nine"));
+  s=step(s,"GO","archive");
+  assert.equal(s.room,"archive");
+  s=step(s,"LOOK","calendar");assert.ok(s.clues.includes("safe-six"));
+  s=step(s,"OPEN","cabinet");
+  s=step(s,"TAKE","diary");s=step(s,"TAKE","receipt");
+  assert.ok(s.clues.includes("coerced-engagement"));
+  assert.ok(s.clues.includes("ashworth-payment"));
+  s=step(s,"GO","exit");
+  assert.equal(s.room,"office");
+  assert.equal(validateSave(s).room,"office");
+});
+test("three-dial safe accepts 369, rejects wrong combinations and protects from duplicates",()=>{
+  let s=reachAgency();
+  s=step(s,"LOOK","safe");
+  s=adjustAgencyDial(s,0,1);
+  s=submitAgencySafe(s);
+  assert.equal(s.case3.safeOpen,false);
+  s=adjustAgencyDial(s,0,-1); // back to zero
+  s=adjustAgencyDial(s,0,-1); // nine
+  assert.equal(s.case3.safeDigits[0],9,"dials rotate across zero");
+  s=adjustAgencyDial(s,0,1);
+  for(let i=0;i<3;i++)for(let j=0;j<[3,6,9][i];j++)s=adjustAgencyDial(s,i,1);
+  s=submitAgencySafe(s);
+  assert.equal(s.case3.safeOpen,true);
+  assert.ok(s.clues.includes("safe-open"));
+  s=collectAgencyFile(s);
+  assert.ok(s.inventory.includes("case-file"));
+  assert.ok(s.clues.includes("webb-engagement"));
+  const prev=s.inventory.length;
+  s=collectAgencyFile(s);
+  assert.equal(s.inventory.length,prev);
+});
+test("board deductions require evidence and completed board unlocks Vera's call",()=>{
+  let s=reachAgency();
+  s=step(s,"LOOK","board");
+  assert.equal(BOARD_OPTIONS.length,4);
+  s=agencyBoardChoice(s,"eleanor");
+  assert.equal(s.case3.boardLinks.length,0,"portrait required");
+  s=agencyBoardChoice(s,"kingfisher");
+  assert.deepEqual(s.case3.boardLinks,["kingfisher"]);
+  s=step(s,"OPEN","desk");
+  s=step(s,"OPEN","drawer");
+  s=step(s,"TAKE","photograph");
+  s=step(s,"LOOK","board");
+  s=agencyBoardChoice(s,"eleanor");
+  s=agencyBoardChoice(s,"webb");
+  assert.equal(s.case3.boardSolved,false,"safe folder required");
+  s=dialTo(s,[3,6,9]);
+  s=submitAgencySafe(s);
+  s=collectAgencyFile(s);
+  s=step(s,"LOOK","board");
+  s=agencyBoardChoice(s,"webb");
+  assert.equal(s.case3.boardSolved,true);
+  assert.ok(s.transcript.some(x=>x.text.includes("RINGING")));
+  s=step(s,"TALK","telephone");
+  assert.equal(s.status,"chapter3complete");
+  assert.ok(s.clues.includes("vera-call"));
+  assert.ok(s.transcript.some(x=>x.text.includes("Ashworth Manor. Midnight")));
+  assert.equal(step(s,"TALK","telephone").status,"chapter3complete","ending stable");
+});
+test("the telephone won't end the chapter before case board is solved",()=>{
+  let s=reachAgency();
+  s=step(s,"TALK","telephone");
+  assert.equal(s.status,"playing");
+  assert.ok(!s.clues.includes("vera-call"));
+});
+test("chapter 2 JSON save resumes Chapter 3 and v3 case state round-trips",()=>{
+  let s=reachAgency();
+  s=step(s,"OPEN","desk");
+  s=step(s,"OPEN","drawer");
+  s=step(s,"TAKE","photograph");
+  s=step(s,"LOOK","safe");
+  s=adjustAgencyDial(s,0,1);
+  const loaded=validateSave(JSON.parse(JSON.stringify(s)));
+  assert.equal(loaded.version,3);
+  assert.equal(loaded.chapter,3);
+  assert.equal(loaded.case3.safeDigits[0],1);
+  assert.ok(loaded.inventory.includes("gala-photo"));
+  const v2={...s,version:2,room:"agency",chapter:2,status:"chapter2complete"};
+  delete v2.case3;
+  const migrated=validateSave(v2);
+  assert.equal(migrated.version,3);
+  assert.equal(continueAgencyCase(migrated).chapter,3);
+});
+test("corrupt agency data normalizes dial values and unknown evidence links",()=>{
+  const s=reachAgency();
+  s.case3.safeDigits=[100,-1,"9"];
+  s.case3.boardLinks=["eleanor","bad","eleanor","kingfisher"];
+  const loaded=validateSave(s);
+  assert.deepEqual(loaded.case3.safeDigits,[0,0,0]);
+  assert.deepEqual(loaded.case3.boardLinks,["eleanor","kingfisher"]);
+  assert.equal(loaded.case3.boardSolved,false);
 });
