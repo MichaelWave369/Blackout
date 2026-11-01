@@ -23,3 +23,14 @@ footer{text-align:center;letter-spacing:.12em;font-size:10px;color:#777989;margi
 .choice-panel button{flex:1 1 135px;margin:0;min-height:40px}
 .scene-objects button:disabled,.verbs button:disabled{opacity:.5;cursor:not-allowed}
 @media(max-width:530px){.verbs{grid-template-columns:repeat(3,minmax(0,1fr))}.verbs button{min-height:39px}.choice-panel button{flex-basis:100%}}
+
+/* v0.3: a legible, keyboard accessible combination dial and detective corkboard. */
+.agency-hint{color:#bcb2a6;font-size:11px;line-height:1.5;width:100%}
+.safe-dials{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;width:100%;margin:8px 0}
+.safe-dial{display:flex;flex-direction:column;align-items:center;gap:6px;background:#211d28;border:1px solid #7d6658;padding:10px 6px}
+.safe-dial span{font-size:10px;color:#dfc6a4;letter-spacing:.12em}
+.safe-dial output{font-size:29px;color:#ffe1a2;font-weight:bold;line-height:1.2;font-variant-numeric:tabular-nums}
+.safe-dial button{width:80%;max-width:110px;padding:9px;border:1px solid #806b58;background:#3a3036;color:#ffe1a2}
+.safe-dial button:hover{background:#65434b}
+.choice-panel button:disabled{opacity:.55;cursor:default}
+@media(max-width:530px){.safe-dials{gap:4px}.safe-dial{padding:8px 2px}.safe-dial span{font-size:8px}}
