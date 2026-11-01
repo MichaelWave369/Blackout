@@ -501,6 +501,7 @@ test("all v1-v3 exports remain importable, and v4 Manor state round-trips",()=>{
   assert.deepEqual(restored.case4.portraitSequence,["harold"]);
   assert.ok(restored.inventory.includes("manor-diary"));
   assert.equal(restored.case4.haroldTrust,-2);
+  assert.equal(restored.case3.boardSolved,true,"Chapter 3 evidence-board state survives Chapter 4 import");
   for(const version of [1,2,3]){
     const legacy={...initialState(),version};
     delete legacy.case4;delete legacy.case3;
