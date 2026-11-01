@@ -1,7 +1,8 @@
 import {
-  initialState, validateSave, setStoryMode, act, chooseEvidence,
+  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, chooseDialogue, TOMMY_OPTIONS,
   ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
 } from "./engine.js";
+import { drawChapter2 } from "./chapter2-art.js";
 
 const $ = id => document.getElementById(id);
 const canvas = $("scene");
@@ -16,14 +17,27 @@ const names = {
   towel: "Hotel towel", screwdriver: "Screwdriver", wallet: "Vincent's wallet",
   matchbook: "Crimson matchbook", body: "Unknown victim", identity: "Vincent Morrow",
   reflection: "Cracked mirror", "red-door": "The Crimson Lounge", "blue-door": "Find the blue door",
-  "off-hook-phone": "Disconnected call"
+  "off-hook-phone": "Disconnected call",
+  newspaper: "Ashworth newspaper", lighter: "Silver lighter", "ashworth-headline": "Ashworth missing",
+  "lounge-match": "Red-door connection", "bouncer-recognition": "Bouncer recognizes Vincent",
+  "tommy-testimony": "Tommy saw the woman", "kingfisher-lead": "The Kingfisher",
+  "lighter-initials": "T.T. initials", "jazz-warning": "The woman in blue",
+  "kingfisher-whisper": "The Kingfisher warning"
 };
 const descriptions = {
   body: "Gunshot wound, unknown victim", identity: "Private investigator's license: Vincent Morrow",
   reflection: "Dried blood and an unfamiliar reflection",
   "red-door": "Matchbook from a jazz club with a red door",
   "off-hook-phone": "Receiver left off its hook",
-  "blue-door": "A woman's voice whispers: Find the blue door"
+  "blue-door": "A woman's voice whispers: Find the blue door",
+  "ashworth-headline": "Eleanor Ashworth has been missing for three weeks",
+  "lounge-match": "Red matchbook connects room 214 with the Crimson Lounge",
+  "bouncer-recognition": "Club doorman knows Vincent Morrow",
+  "tommy-testimony": "Tommy saw Vincent with a woman in a blue coat",
+  "kingfisher-lead": "Kingfisher is connected to Ashworth money",
+  "lighter-initials": "Silver lighter engraved T.T.",
+  "jazz-warning": "Tommy warned Vincent about the woman in blue",
+  "kingfisher-whisper": "A remembered bribe, a violent threat, and the name Kingfisher"
 };
 const zones = {
   bathroom: [
@@ -43,7 +57,20 @@ const zones = {
     ["window", 20, 36, 99, 117], ["sign", 196, 21, 120, 80],
     ["rail", 85, 113, 160, 63]
   ],
-  alley: [["rain", 0, 0, 320, 200], ["matchbook", 130, 143, 67, 45]]
+  alley: [["rain", 0, 0, 320, 200], ["matchbook", 130, 143, 67, 45], ["street", 230, 9, 90, 77]],
+  street: [
+    ["alley", 0, 0, 58, 88], ["sign", 121, 11, 125, 59],
+    ["puddle", 55, 178, 204, 22], ["newspaper", 4, 100, 68, 90],
+    ["patrol", 75, 98, 41, 78], ["door", 147, 75, 69, 112],
+    ["agency", 255, 52, 65, 125]
+  ],
+  lounge: [
+    ["exit", 1, 26, 38, 170], ["booth", 48, 94, 63, 71],
+    ["bouncer", 16, 96, 28, 82], ["piano", 242, 75, 76, 107],
+    ["bar", 106, 141, 135, 59], ["tommy", 154, 79, 42, 93],
+    ["telephone", 215, 122, 25, 27], ["lighter", 159, 146, 33, 17]
+  ],
+  agency: [["sign", 59, 34, 209, 52], ["door", 116, 78, 99, 118]]
 };
 const palette = {
   bg: "#0b0e1c", tile: "#282735", gold: "#c6a976", blue: "#66858f",
@@ -199,7 +226,7 @@ function drawAlley() {
   for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
 }
 function drawRain() {
-  if(state.room==="bathroom"||state.room==="suite")return;
+  if(state.room==="bathroom"||state.room==="suite"||state.room==="lounge")return;
   for(let i=0;i<47;i++){
     const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
     line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
@@ -211,7 +238,8 @@ function drawScene(){
   if(room==="bathroom")drawBathroom();
   else if(room==="suite")drawSuite();
   else if(room==="escape")drawEscape();
-  else drawAlley();
+  else if(room==="alley")drawAlley();
+  else drawChapter2(ctx,state,frame);
   drawRain();
   // cinematic pixel border
   rect(0,0,320,2,"#080a12");rect(0,198,320,2,"#080a12");
@@ -223,6 +251,10 @@ function drawScene(){
   if(state.status==="escaped") {
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
     textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
+  }
+  if(state.status==="chapter2complete") {
+    rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
+    textAt("CHAPTER 2 COMPLETE",62,40,"#f2d092",12);
   }
 }
 function makeButton(text, onClick, attrs={}){
@@ -243,17 +275,37 @@ function commit(){
 }
 function render(){
   $("roomName").textContent=ROOM_NAMES[state.room];
-  $("filmStamp").textContent=state.room==="bathroom"?"CHICAGO / 2:13 AM":state.room==="suite"?"ROOM 214 / 2:19 AM":state.room==="escape"?"FIRE ESCAPE / 2:23 AM":"CHICAGO / 2:27 AM";
-  $("objective").textContent=state.status==="caught"?"CASE STATUS: ARRESTED":state.status==="escaped"?"CASE STATUS: ESCAPED":state.room==="bathroom"?"OBJECTIVE: RECOVER YOUR IDENTITY":state.room==="suite"?"OBJECTIVE: FIND CLUES AND ESCAPE":state.room==="escape"?"OBJECTIVE: DESCEND TO THE ALLEY":"OBJECTIVE: SURVIVE";
-  $("policeStatus").textContent=state.status==="caught"?"POLICE: HERE":state.status==="escaped"?"POLICE: EVADED":state.pressure>=25?"POLICE: AT THE DOOR":state.pressure>=17?"POLICE: APPROACHING":state.pressure>=9?"POLICE: SIRENS":"POLICE: DISTANT";
+  $("filmStamp").textContent={
+    bathroom:"CHICAGO / 2:13 AM",suite:"ROOM 214 / 2:19 AM",
+    escape:"FIRE ESCAPE / 2:23 AM",alley:"CHICAGO / 2:27 AM",
+    street:"CHICAGO / 2:34 AM",lounge:"THE CRIMSON LOUNGE / 2:41 AM",agency:"WEST LAKE ST / 3:02 AM"
+  }[state.room];
+  $("objective").textContent=state.status==="caught"?"CASE STATUS: ARRESTED":
+    state.status==="escaped"?"CHAPTER COMPLETE: CONTINUE BELOW":
+    state.status==="chapter2complete"?"CHAPTER COMPLETE: THE AGENCY AWAITS":
+    ({bathroom:"OBJECTIVE: RECOVER YOUR IDENTITY",suite:"OBJECTIVE: FIND CLUES AND ESCAPE",
+    escape:"OBJECTIVE: DESCEND TO THE ALLEY",alley:"OBJECTIVE: REACH THE CRIMSON LOUNGE",
+    street:state.inventory.includes("lighter")?"OBJECTIVE: FIND THE DETECTIVE AGENCY":"OBJECTIVE: ENTER THE CRIMSON LOUNGE",
+    lounge:"OBJECTIVE: QUESTION TOMMY TWO-FINGERS",agency:"CASE STATUS: NEXT CHAPTER"}[state.room]);
+  $("policeStatus").textContent=state.status==="caught"?"POLICE: HERE":
+    state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
+    state.pressure>=25?"POLICE: AT THE DOOR":state.pressure>=17?"POLICE: APPROACHING":
+    state.pressure>=9?"POLICE: SIRENS":"POLICE: DISTANT";
   $("storyMode").checked=state.storyMode;
+  $("continueBtn").hidden=!(state.status==="escaped"&&state.room==="alley"&&state.chapter===1);
   const verbs=$("verbs");verbs.replaceChildren();
   VERBS.forEach((v,i)=>verbs.appendChild(makeButton((i+1)+". "+v,()=>{verb=v;if(v!=="USE")item="";render();},{"aria-pressed":String(verb===v)})));
-  $("commandTip").textContent=state.status!=="playing"?"Case closed for now. NEW CASE begins again.":verb==="USE"?(item?"USE "+(names[item]||item)+" ON WHAT?":"Choose an inventory item, then choose the target."):verb+" selected. Choose an object below or click the picture.";
+  $("commandTip").textContent=state.status==="escaped"?"Chapter 1 complete. Use CONTINUE TO CHAPTER 2 below.":
+    state.status==="chapter2complete"?"Chapter 2 complete. Your case file is saved for the next chapter.":
+    state.status!=="playing"?"Case closed. NEW CASE begins again.":
+    verb==="USE"?(item?"USE "+(names[item]||item)+" ON WHAT?":"Choose an inventory item, then choose the target."):
+    verb==="TALK"?"Select someone to question. Tommy has a lot to explain.":
+    verb+" selected. Choose an object below or click the picture.";
   const objects=$("sceneObjects");objects.replaceChildren();
-  visibleTargets(state).forEach(([id,label])=>objects.appendChild(makeButton(label,()=>doAction(id),{"aria-label":verb+" "+label,"disabled":state.status!=="playing"?"":null})));
-  // Remove invalid boolean attribute values to keep buttons actually enabled.
-  if(state.status==="playing") objects.querySelectorAll("button").forEach(b=>b.removeAttribute("disabled"));
+  visibleTargets(state).forEach(([id,label])=>{
+    const button=makeButton(label,()=>doAction(id),{"aria-label":verb+" "+label});
+    button.disabled=state.status!=="playing";objects.appendChild(button);
+  });
   const inv=$("inventory");inv.replaceChildren();
   if(!state.inventory.length) {
     const e=document.createElement("div");e.className="empty";e.textContent="Your pockets are empty.";inv.appendChild(e);
@@ -275,11 +327,19 @@ function render(){
   state.transcript.forEach(entry=>{const p=document.createElement("p");p.className=entry.kind;p.textContent=entry.text;log.appendChild(p);});
   if(nearBottom)log.scrollTop=log.scrollHeight;
   const choices=$("choicePanel");choices.replaceChildren();
-  choices.hidden=!(state.room==="suite"&&state.flags.body&&!state.flags.evidenceChoice&&state.status==="playing");
-  if(!choices.hidden){
+  const crimeChoice=state.room==="suite"&&state.flags.body&&!state.flags.evidenceChoice&&state.status==="playing";
+  const tommyChoice=state.room==="lounge"&&state.dialogue==="tommy"&&state.status==="playing";
+  choices.hidden=!(crimeChoice||tommyChoice);
+  if(crimeChoice){
     const strong=document.createElement("strong");strong.textContent="A CHOICE: WHAT DO YOU DO WITH THE CRIME SCENE?";choices.appendChild(strong);
     choices.appendChild(makeButton("PRESERVE EVIDENCE",()=>{state=chooseEvidence(state,"preserve");commit();}));
     choices.appendChild(makeButton("WIPE FINGERPRINTS",()=>{state=chooseEvidence(state,"erase");commit();}));
+  }
+  if(tommyChoice){
+    const strong=document.createElement("strong");strong.textContent="TOMMY TWO-FINGERS / CONVERSATION";choices.appendChild(strong);
+    TOMMY_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseDialogue(state,option.id);commit();
+    })));
   }
   drawScene();
 }
@@ -302,9 +362,10 @@ canvas.addEventListener("mousemove",e=>{
 document.addEventListener("keydown",e=>{
   if(e.altKey||e.ctrlKey||e.metaKey||/INPUT|TEXTAREA/.test(document.activeElement?.tagName||""))return;
   const n=Number(e.key);
-  if(n>=1&&n<=5){verb=VERBS[n-1];if(verb!=="USE")item="";render();}
+  if(n>=1&&n<=6){verb=VERBS[n-1];if(verb!=="USE")item="";render();}
 });
 $("storyMode").addEventListener("change",e=>{state=setStoryMode(state,e.target.checked);commit();});
+$("continueBtn").addEventListener("click",()=>{state=continueCase(state);verb="LOOK";item="";commit();});
 $("restartBtn").addEventListener("click",()=>{
   if(!window.confirm("Start a new case? The current auto-save will be replaced. Export first if you want to keep it."))return;
   state=initialState();verb="LOOK";item="";$("fileMessage").textContent="Fresh case opened.";commit();
@@ -312,7 +373,7 @@ $("restartBtn").addEventListener("click",()=>{
 $("exportBtn").addEventListener("click",()=>{
   const content=JSON.stringify(state,null,2);
   const url=URL.createObjectURL(new Blob([content],{type:"application/json"}));
-  const a=document.createElement("a");a.href=url;a.download="blackout-case-v1.json";
+  const a=document.createElement("a");a.href=url;a.download="blackout-case-v2.json";
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
   $("fileMessage").textContent="Case file exported. You can restore it later.";
 });
