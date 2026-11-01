@@ -12,3 +12,14 @@ footer{text-align:center;letter-spacing:.12em;font-size:10px;color:#777989;margi
 @media(max-width:850px){.case-grid{grid-template-columns:1fr}.sidebar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.case-stamp{grid-column:1/-1}.side-panel{min-height:100px}.masthead{margin-bottom:19px}}
 @media(max-width:530px){.shell{padding:12px}.masthead .kicker{font-size:9px}.strap{font-size:10px}.screen{border-width:6px}.panel-head,.screen-footer{font-size:9px;padding:8px}.command-panel,.log-panel{padding:11px}.verbs{gap:3px}.verbs button{font-size:10px;min-height:32px}.scene-objects{grid-template-columns:repeat(2,minmax(0,1fr))}.sidebar{grid-template-columns:1fr}.side-panel{min-height:0}footer{font-size:9px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+/* Chapter two: a clearer conversational choice board and continuation CTA. */
+.verbs{grid-template-columns:repeat(6,minmax(0,1fr))}
+.chapter-continue{display:block;width:100%;margin:0 0 15px;padding:13px 9px;border:1px solid #df8a67;background:linear-gradient(90deg,#733340,#3a2c42);color:#fff0d4;font-size:12px;font-weight:800;letter-spacing:.06em;text-align:center}
+.chapter-continue:hover{background:linear-gradient(90deg,#a64750,#55415a)}
+[hidden]{display:none!important}
+.choice-panel{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.choice-panel strong{width:100%;letter-spacing:.09em}
+.choice-panel button{flex:1 1 135px;margin:0;min-height:40px}
+.scene-objects button:disabled,.verbs button:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:530px){.verbs{grid-template-columns:repeat(3,minmax(0,1fr))}.verbs button{min-height:39px}.choice-panel button{flex-basis:100%}}
