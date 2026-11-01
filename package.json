@@ -1,0 +1,11 @@
+{
+  "name": "blackout-retro",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A retro-first 1947 Chicago noir detective mystery.",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/engine.js && node --check src/app.js"
+  }
+}
