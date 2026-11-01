@@ -1,0 +1,339 @@
+import {
+  initialState, validateSave, setStoryMode, act, chooseEvidence,
+  ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
+} from "./engine.js";
+
+const $ = id => document.getElementById(id);
+const canvas = $("scene");
+const ctx = canvas.getContext("2d", { alpha: false });
+ctx.imageSmoothingEnabled = false;
+const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let state;
+let verb = "LOOK";
+let item = "";
+let frame = 0;
+const names = {
+  towel: "Hotel towel", screwdriver: "Screwdriver", wallet: "Vincent's wallet",
+  matchbook: "Crimson matchbook", body: "Unknown victim", identity: "Vincent Morrow",
+  reflection: "Cracked mirror", "red-door": "The Crimson Lounge", "blue-door": "Find the blue door",
+  "off-hook-phone": "Disconnected call"
+};
+const descriptions = {
+  body: "Gunshot wound, unknown victim", identity: "Private investigator's license: Vincent Morrow",
+  reflection: "Dried blood and an unfamiliar reflection",
+  "red-door": "Matchbook from a jazz club with a red door",
+  "off-hook-phone": "Receiver left off its hook",
+  "blue-door": "A woman's voice whispers: Find the blue door"
+};
+const zones = {
+  bathroom: [
+    ["mirror", 107, 29, 102, 103], ["cabinet", 22, 43, 69, 92],
+    ["towel", 230, 103, 45, 65], ["sink", 108, 128, 92, 65],
+    ["tile", 2, 155, 110, 45], ["door", 272, 24, 48, 170],
+    ["screwdriver", 27, 100, 54, 35]
+  ],
+  suite: [
+    ["window", 224, 24, 77, 112], ["body", 116, 101, 85, 98],
+    ["jacket", 20, 103, 90, 94], ["wallet", 50, 128, 48, 45],
+    ["ashtray", 179, 117, 49, 40], ["matchbook", 179, 117, 49, 40],
+    ["telephone", 20, 111, 90, 50], ["door", 299, 10, 21, 190]
+  ],
+  escape: [
+    ["ladder", 189, 97, 120, 103], ["street", 0, 171, 320, 29],
+    ["window", 20, 36, 99, 117], ["sign", 196, 21, 120, 80],
+    ["rail", 85, 113, 160, 63]
+  ],
+  alley: [["rain", 0, 0, 320, 200], ["matchbook", 130, 143, 67, 45]]
+};
+const palette = {
+  bg: "#0b0e1c", tile: "#282735", gold: "#c6a976", blue: "#66858f",
+  shadow: "#101320", gray: "#6a6974", red: "#ad3a44",
+  white: "#c5c2ad", wall: "#292b3a", rose: "#65424a"
+};
+function rect(x,y,w,h,color) { ctx.fillStyle = color; ctx.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h)); }
+function line(x1,y1,x2,y2,color,width=1) {
+  ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth=width;
+  ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+}
+function poly(points,color) {
+  ctx.fillStyle=color; ctx.beginPath(); ctx.moveTo(points[0][0],points[0][1]);
+  for(let i=1;i<points.length;i++) ctx.lineTo(points[i][0],points[i][1]);
+  ctx.closePath(); ctx.fill();
+}
+function glow(x,y,r,color) {
+  const g=ctx.createRadialGradient(x,y,2,x,y,r);
+  g.addColorStop(0,color); g.addColorStop(1,"#00000000");
+  ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2);
+}
+function textAt(str,x,y,color,size=7) {
+  ctx.font="bold "+size+"px monospace";ctx.fillStyle=color;ctx.fillText(str,x,y);
+}
+function gridFloor(yBase, colors) {
+  poly([[0,yBase],[320,yBase],[320,200],[0,200]],colors[0]);
+  for(let i=0;i<9;i++) line(160,yBase, i*48-30,200,colors[1]);
+  for(let i=1;i<5;i++) { const y=yBase+Math.round(Math.pow(i/4,1.7)*(200-yBase));line(0,y,320,y,colors[1]); }
+}
+function drawBathroom() {
+  rect(0,0,320,200,"#1c2330");
+  poly([[0,0],[320,0],[320,142],[0,156]],"#303440");
+  for(let i=0;i<12;i++) line(i*29,7,i*29,149,"#363945");
+  rect(0,0,320,9,"#131621");
+  gridFloor(145,["#222632","#44404b"]);
+  // Mirror. Deliberately chunky 8-bit room illustration.
+  rect(101,24,111,107,"#11131f");rect(105,28,103,99,"#b49a71");
+  rect(111,33,91,87,"#394755");
+  if(!state.flags.mirror) {
+    for(let i=0;i<18;i++) rect(113+(i*29)%84,38+(i*17)%78,25,6,i%2?"#63727a":"#50616c");
+    line(113,44,196,112,"#97a0a4",2); line(180,43,166,81,"#97a0a4");
+  } else {
+    glow(152,70,45,"#657a7955");
+    rect(146,45,27,32,"#7a6c67");rect(141,55,8,28,"#5b5b5e");rect(169,56,10,24,"#5b5b5e");
+    poly([[140,79],[178,79],[196,118],[122,118]],"#202431");
+    rect(149,67,6,3,"#1b1c26");rect(165,67,6,3,"#1b1c26");
+    line(172,49,160,62,"#b5474b",2);
+  }
+  // Medicine cabinet, cracked open when unlocked
+  rect(17,43,71,85,"#121721");rect(22,48,61,75,"#54606a");
+  rect(26,52,53,65,"#303f4c");
+  if(state.opened.includes("cabinet")) {rect(31,52,39,59,"#17202c");rect(37,62,17,23,"#888176");rect(48,91,15,4,"#b2a18f");}
+  else {rect(74,78,3,10,"#b9ad88");line(22,48,83,123,"#6d7480");}
+  rect(107,128,94,12,"#a69b87");rect(117,141,73,34,"#6e6a67");
+  rect(128,134,52,8,"#262c37");rect(148,133,7,4,"#b6aaa0");
+  rect(119,176,69,20,"#292b36");rect(195,129,9,45,"#4e4d57");
+  // Towel and hook
+  rect(251,99,3,11,"#e9bba1");
+  if(!state.inventory.includes("towel")) {
+    poly([[230,108],[270,108],[267,171],[237,169]],"#a6a6a0");
+    for(let i=0;i<5;i++)rect(237+i*6,154,2,15,"#92939c");
+  }
+  // Back door
+  rect(278,21,42,163,"#151c26");rect(282,29,35,148,"#30313b");
+  rect(287,37,24,71,"#49414d");rect(289,112,22,54,"#43404a");rect(285,112,4,5,"#c7ad7e");
+  rect(0,0,21,144,"#151b25");
+  if(state.pressure>=17) glow(310,128,42,"#e6546655");
+  // Clue: bloodstained tile
+  rect(37,183,10,3,"#8c3b46");rect(54,180,6,3,"#99404a");rect(51,188,14,2,"#6e303a");
+}
+function drawSuite() {
+  rect(0,0,320,200,"#202331");
+  rect(0,16,320,130,"#3b3340");
+  for(let i=0;i<23;i++){ rect(i*15,17,3,126,"#493f47");rect(i*15+6,17,2,126,"#302b3d"); }
+  rect(0,9,320,10,"#171723");rect(0,139,320,8,"#171822");
+  gridFloor(148,["#2e2b35","#564451"]);
+  // window with Chicago skyline and rain
+  rect(219,23,85,114,"#1a1724");rect(224,28,76,104,"#2a3d52");
+  rect(232,80,13,47,"#1b2734");rect(244,64,15,63,"#1a2837");rect(267,73,26,54,"#1b2837");
+  for(let i=0;i<25;i++) rect(229+(i*17)%65,54+(i*23)%63,2,3,i%4===0?"#bd795f":"#8a7171");
+  line(264,29,264,131,"#998371",4);line(225,87,300,87,"#998371",3);
+  if(state.flags.window) {rect(225,110,74,19,"#141d2c");line(230,115,293,115,"#5b737a");}
+  rect(210,20,10,121,"#6d3641");rect(301,20,8,121,"#6d3641");
+  // bed and jacket
+  rect(9,132,113,23,"#181a24");rect(15,137,99,44,"#5c5260");
+  rect(16,120,45,22,"#a6a09a");rect(64,124,48,16,"#7b7984");
+  rect(20,167,104,17,"#43333d");rect(32,150,24,25,"#343139");
+  if(!state.opened.includes("jacket")) {poly([[24,120],[75,120],[92,167],[32,165]],"#242634");rect(48,131,4,30,"#3d4352");}
+  // side table and telephone
+  rect(176,120,49,10,"#211c28");rect(181,129,38,51,"#443a3e");
+  rect(185,113,24,10,"#111721");rect(188,108,19,8,"#34333d");rect(193,121,5,8,"#8d8481");
+  // standing floor lamp
+  rect(113,30,56,37,"#ad8e64");rect(119,37,45,24,"#d2b681");rect(139,65,4,58,"#6e6865");
+  glow(141,73,74,"#a88d6330");
+  // Victim in armchair, subdued noir silhouettes
+  rect(129,142,72,42,"#15151d");
+  poly([[140,131],[183,128],[192,162],[132,162]],"#23252f");
+  rect(153,102,28,29,"#685e60");rect(147,112,11,22,"#524e57");
+  poly([[148,127],[186,125],[205,172],[132,170]],"#373541");
+  rect(169,139,5,5,"#963d49");
+  rect(148,171,11,27,"#242630");rect(179,169,13,28,"#222630");
+  rect(157,105,7,3,"#1d1c29");rect(173,105,7,3,"#1d1c29");
+  // matchbook near ashtray
+  rect(197,113,23,5,"#15161d");
+  if(!state.inventory.includes("matchbook")){rect(203,110,14,8,"#a73c47");rect(205,112,10,2,"#eab8a7");}
+  rect(0,0,7,200,"#14151e");
+  if(state.pressure>=17){glow(315,93,49,"#e3424a65");}
+}
+function drawEscape() {
+  rect(0,0,320,200,"#111a2d");rect(0,0,320,80,"#18223c");
+  glow(243,35,47,"#97333f65");glow(63,26,50,"#a77a6260");
+  for(let i=0;i<18;i++){
+    const x=i*21;const h=44+((i*37)%55);
+    rect(x,135-h,20,h,"#172131");
+    for(let j=0;j<6;j++)if((i+j)%3!==0)rect(x+5+(j%2)*8,141-h+(j*9)%Math.max(h-6,7),2,3,"#896d6e");
+  }
+  // hotel brickwork
+  rect(0,0,113,200,"#42343f");for(let y=0;y<200;y+=10) {
+    line(0,y,113,y,"#231f2d");for(let x=(y%20===0?0:12);x<113;x+=24)line(x,y,x,y+10,"#302733");
+  }
+  rect(19,37,93,103,"#181927");rect(24,43,82,89,"#6f5b58");rect(30,48,69,77,"#202d3a");
+  line(63,45,63,127,"#ab997b",4);
+  if(state.pressure>=17)glow(29,108,70,"#e4485655");
+  // dramatic iron catwalk
+  poly([[79,144],[223,137],[320,165],[320,184],[86,172]],"#1c1d25");
+  for(let x=91;x<320;x+=15){rect(x,143,3,36,"#5e6268");}
+  line(86,143,315,137,"#969294",3);line(82,166,319,165,"#969294",2);
+  for(let x=102;x<317;x+=25)line(x,145,x+14,166,"#6a6b72");
+  // descending ladder
+  rect(247,161,4,39,"#969294");rect(292,161,4,39,"#969294");
+  for(let y=166;y<200;y+=9)line(249,y,293,y,"#777e82",2);
+  // neon sign
+  rect(192,25,128,42,"#231621");rect(196,29,123,34,"#7d2d39");
+  rect(200,33,116,26,"#221f2e");textAt("CRIMSON",207,44,"#df5b64",10);textAt("LOUNGE",223,56,"#e8a4a1",9);
+  glow(255,45,72,"#b53c4655");
+}
+function drawAlley() {
+  rect(0,0,320,200,"#101627");
+  glow(241,40,84,"#a03c4860");glow(85,54,92,"#3f688a55");
+  rect(0,0,71,169,"#242536");rect(248,0,72,170,"#2b2937");
+  for(let y=0;y<170;y+=12){line(0,y,71,y,"#383441");line(248,y,320,y,"#433543");}
+  poly([[71,110],[249,110],[320,200],[0,200]],"#1a2532");
+  for(let i=0;i<9;i++)line(156,112,i*48-30,200,"#313340");
+  rect(224,14,96,36,"#321e2a");textAt("CRIMSON",231,29,"#e5696d",10);textAt("LOUNGE",244,40,"#df9b95",9);
+  // detective silhouette with coat and hat, back to camera
+  rect(139,83,38,6,"#0b0c12");rect(145,75,24,15,"#0b0c12");
+  rect(150,86,17,16,"#1b1a23");poly([[140,100],[174,100],[193,160],[124,160]],"#10141d");
+  poly([[144,158],[156,158],[153,198],[132,198]],"#10141d");
+  poly([[159,156],[172,156],[190,198],[165,198]],"#10141d");
+  rect(139,108,7,39,"#1e202b");
+  // hint of red matchbook and reflections
+  rect(178,151,9,11,"#bc3c49");
+  for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
+}
+function drawRain() {
+  if(state.room==="bathroom"||state.room==="suite")return;
+  for(let i=0;i<47;i++){
+    const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
+    line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
+  }
+}
+function drawScene(){
+  ctx.clearRect(0,0,320,200);
+  const room=state.room;
+  if(room==="bathroom")drawBathroom();
+  else if(room==="suite")drawSuite();
+  else if(room==="escape")drawEscape();
+  else drawAlley();
+  drawRain();
+  // cinematic pixel border
+  rect(0,0,320,2,"#080a12");rect(0,198,320,2,"#080a12");
+  if(state.status==="caught") {
+    rect(35,73,250,56,"#150e1bdd");rect(37,75,246,52,"#522633");
+    textAt("YOU HAVE BEEN ARRESTED",56,102,"#f1c0b3",11);
+    textAt("NEW CASE TO TRY AGAIN",72,117,"#e4c694",7);
+  }
+  if(state.status==="escaped") {
+    rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
+    textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
+  }
+}
+function makeButton(text, onClick, attrs={}){
+  const b=document.createElement("button");
+  b.type="button";b.textContent=text;
+  for(const [key,value] of Object.entries(attrs)) b.setAttribute(key,value);
+  b.addEventListener("click",onClick);
+  return b;
+}
+function doAction(target) {
+  state=act(state,verb,target,item);
+  if(verb==="USE") item="";
+  commit();
+}
+function commit(){
+  try { localStorage.setItem(STORAGE_KEY,JSON.stringify(state)); } catch(e) { $("fileMessage").textContent="Auto-save unavailable. Export your case file manually."; }
+  render();
+}
+function render(){
+  $("roomName").textContent=ROOM_NAMES[state.room];
+  $("filmStamp").textContent=state.room==="bathroom"?"CHICAGO / 2:13 AM":state.room==="suite"?"ROOM 214 / 2:19 AM":state.room==="escape"?"FIRE ESCAPE / 2:23 AM":"CHICAGO / 2:27 AM";
+  $("objective").textContent=state.status==="caught"?"CASE STATUS: ARRESTED":state.status==="escaped"?"CASE STATUS: ESCAPED":state.room==="bathroom"?"OBJECTIVE: RECOVER YOUR IDENTITY":state.room==="suite"?"OBJECTIVE: FIND CLUES AND ESCAPE":state.room==="escape"?"OBJECTIVE: DESCEND TO THE ALLEY":"OBJECTIVE: SURVIVE";
+  $("policeStatus").textContent=state.status==="caught"?"POLICE: HERE":state.status==="escaped"?"POLICE: EVADED":state.pressure>=25?"POLICE: AT THE DOOR":state.pressure>=17?"POLICE: APPROACHING":state.pressure>=9?"POLICE: SIRENS":"POLICE: DISTANT";
+  $("storyMode").checked=state.storyMode;
+  const verbs=$("verbs");verbs.replaceChildren();
+  VERBS.forEach((v,i)=>verbs.appendChild(makeButton((i+1)+". "+v,()=>{verb=v;if(v!=="USE")item="";render();},{"aria-pressed":String(verb===v)})));
+  $("commandTip").textContent=state.status!=="playing"?"Case closed for now. NEW CASE begins again.":verb==="USE"?(item?"USE "+(names[item]||item)+" ON WHAT?":"Choose an inventory item, then choose the target."):verb+" selected. Choose an object below or click the picture.";
+  const objects=$("sceneObjects");objects.replaceChildren();
+  visibleTargets(state).forEach(([id,label])=>objects.appendChild(makeButton(label,()=>doAction(id),{"aria-label":verb+" "+label,"disabled":state.status!=="playing"?"":null})));
+  // Remove invalid boolean attribute values to keep buttons actually enabled.
+  if(state.status==="playing") objects.querySelectorAll("button").forEach(b=>b.removeAttribute("disabled"));
+  const inv=$("inventory");inv.replaceChildren();
+  if(!state.inventory.length) {
+    const e=document.createElement("div");e.className="empty";e.textContent="Your pockets are empty.";inv.appendChild(e);
+  } else {
+    state.inventory.forEach(id=>inv.appendChild(makeButton(names[id]||id,()=>{
+      item=item===id?"":id;verb="USE";render();
+    },{"aria-pressed":String(item===id)})));
+  }
+  $("itemCount").textContent=String(state.inventory.length).padStart(2,"0");
+  $("clueCount").textContent=String(state.clues.length).padStart(2,"0");
+  $("memoryCount").textContent=String(state.memories.length).padStart(2,"0");
+  for(const [parentId,items,klass] of [["clues",state.clues,"note"],["memories",state.memories,"note memory"]]) {
+    const p=$(parentId);p.replaceChildren();
+    if(!items.length){const e=document.createElement("div");e.className="empty";e.textContent="Nothing recorded yet.";p.appendChild(e);}
+    items.forEach(id=>{const e=document.createElement("div");e.className=klass;e.textContent=descriptions[id]||names[id]||id;p.appendChild(e);});
+  }
+  const log=$("log");const nearBottom=log.scrollHeight-log.scrollTop-log.clientHeight<45;
+  log.replaceChildren();
+  state.transcript.forEach(entry=>{const p=document.createElement("p");p.className=entry.kind;p.textContent=entry.text;log.appendChild(p);});
+  if(nearBottom)log.scrollTop=log.scrollHeight;
+  const choices=$("choicePanel");choices.replaceChildren();
+  choices.hidden=!(state.room==="suite"&&state.flags.body&&!state.flags.evidenceChoice&&state.status==="playing");
+  if(!choices.hidden){
+    const strong=document.createElement("strong");strong.textContent="A CHOICE: WHAT DO YOU DO WITH THE CRIME SCENE?";choices.appendChild(strong);
+    choices.appendChild(makeButton("PRESERVE EVIDENCE",()=>{state=chooseEvidence(state,"preserve");commit();}));
+    choices.appendChild(makeButton("WIPE FINGERPRINTS",()=>{state=chooseEvidence(state,"erase");commit();}));
+  }
+  drawScene();
+}
+canvas.addEventListener("click",e=>{
+  if(state.status!=="playing")return;
+  const r=canvas.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width*320,y=(e.clientY-r.top)/r.height*200;
+  // Later hotspots are foreground objects and override their background regions.
+  const visible=new Set(visibleTargets(state).map(x=>x[0]));
+  const hits=(zones[state.room]||[]).filter(([id,l,t,w,h])=>visible.has(id)&&x>=l&&x<=l+w&&y>=t&&y<=t+h);
+  const selected=hits.at(-1);
+  if(selected)doAction(selected[0]);else if(verb==="LOOK") { state=act(state,"LOOK","");commit(); }
+});
+canvas.addEventListener("mousemove",e=>{
+  const r=canvas.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width*320,y=(e.clientY-r.top)/r.height*200;
+  const visible=new Set(visibleTargets(state).map(x=>x[0]));
+  canvas.style.cursor=(zones[state.room]||[]).some(([id,l,t,w,h])=>visible.has(id)&&x>=l&&x<=l+w&&y>=t&&y<=t+h)?"pointer":"default";
+});
+document.addEventListener("keydown",e=>{
+  if(e.altKey||e.ctrlKey||e.metaKey||/INPUT|TEXTAREA/.test(document.activeElement?.tagName||""))return;
+  const n=Number(e.key);
+  if(n>=1&&n<=5){verb=VERBS[n-1];if(verb!=="USE")item="";render();}
+});
+$("storyMode").addEventListener("change",e=>{state=setStoryMode(state,e.target.checked);commit();});
+$("restartBtn").addEventListener("click",()=>{
+  if(!window.confirm("Start a new case? The current auto-save will be replaced. Export first if you want to keep it."))return;
+  state=initialState();verb="LOOK";item="";$("fileMessage").textContent="Fresh case opened.";commit();
+});
+$("exportBtn").addEventListener("click",()=>{
+  const content=JSON.stringify(state,null,2);
+  const url=URL.createObjectURL(new Blob([content],{type:"application/json"}));
+  const a=document.createElement("a");a.href=url;a.download="blackout-case-v1.json";
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
+  $("fileMessage").textContent="Case file exported. You can restore it later.";
+});
+$("importBtn").addEventListener("click",()=>$("importFile").click());
+$("importFile").addEventListener("change",async e=>{
+  const file=e.target.files?.[0];if(!file)return;
+  if(file.size>128*1024){$("fileMessage").textContent="Case file too large.";e.target.value="";return;}
+  try {
+    const data=JSON.parse(await file.text());
+    state=validateSave(data);
+    verb="LOOK";item="";$("fileMessage").textContent="Case file restored.";commit();
+  } catch(err){$("fileMessage").textContent=err?.message||"Couldn't load that file.";}
+  e.target.value="";
+});
+try {
+  const raw=localStorage.getItem(STORAGE_KEY);
+  state=raw?validateSave(JSON.parse(raw)):initialState();
+} catch(err){state=initialState();}
+render();
+if(!prefersReducedMotion){
+  let last=0;
+  function animate(now){requestAnimationFrame(animate);if(now-last<85)return;last=now;frame++;drawScene();}
+  requestAnimationFrame(animate);
+}
