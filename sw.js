@@ -1,6 +1,6 @@
 /* BLACKOUT offline app shell, no network services required by gameplay. */
-const CACHE="blackout-blood-on-the-mirror-v1";
-const APP_SHELL=["./","./index.html","./styles.css","./src/app.js","./src/engine.js"];
+const CACHE="blackout-neon-streets-v2";
+const APP_SHELL=["./","./index.html","./styles.css","./src/app.js","./src/engine.js","./src/chapter2-art.js"];
 self.addEventListener("install",event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting()));
 });
