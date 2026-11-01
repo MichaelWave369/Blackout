@@ -1,12 +1,15 @@
 /* BLACKOUT: original retro detective prototype. MIT code license. */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const STORAGE_KEY = "blackout-blood-on-the-mirror-v1";
-export const VERBS = ["LOOK", "TAKE", "OPEN", "USE", "GO"];
+export const VERBS = ["LOOK", "TAKE", "OPEN", "USE", "GO", "TALK"];
 export const ROOM_NAMES = {
   bathroom: "MARMONT HOTEL / BATHROOM",
   suite: "MARMONT HOTEL / ROOM 214",
   escape: "FIRE ESCAPE / CHICAGO",
-  alley: "CHICAGO / RAIN-SOAKED ALLEY"
+  alley: "CHICAGO / RAIN-SOAKED ALLEY",
+  street: "CHICAGO / NEON STREETS",
+  lounge: "THE CRIMSON LOUNGE / MAIN FLOOR",
+  agency: "VINCENT MORROW / DETECTIVE AGENCY"
 };
 export const HOTSPOTS = {
   bathroom: [
@@ -26,7 +29,17 @@ export const HOTSPOTS = {
     ["street", "Street below"], ["sign", "Crimson neon"],
     ["rail", "Rusty railing"]
   ],
-  alley: [["rain", "Falling rain"], ["matchbook", "The matchbook"]]
+  alley: [["rain", "Falling rain"], ["matchbook", "The matchbook"], ["street", "Neon street"]],
+  street: [
+    ["newspaper", "Newspaper stand"], ["patrol", "Police patrol"], ["sign", "Crimson neon"],
+    ["door", "Red club door"], ["puddle", "Rain puddle"], ["agency", "Detective agency"], ["alley", "Hotel alley"]
+  ],
+  lounge: [
+    ["tommy", "Tommy Two-Fingers"], ["bouncer", "Club doorman"], ["bar", "Bar counter"],
+    ["lighter", "Engraved lighter"], ["piano", "Jazz pianist"], ["booth", "Shadowed booth"],
+    ["telephone", "Club telephone"], ["exit", "Street exit"]
+  ],
+  agency: [["door", "Locked office door"], ["sign", "Detective agency sign"]]
 };
 export const INTRO = [
   "CHICAGO. 1947. 2:13 A.M.",
@@ -35,8 +48,8 @@ export const INTRO = [
 ];
 const BASE = {
   version: SAVE_VERSION,
-  room: "bathroom", inventory: [], clues: [], memories: [], discovered: [],
-  opened: [], flags: { mirror: false, body: false, identity: false, window: false, memory: false, evidenceChoice: "" },
+  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, inventory: [], clues: [], memories: [], discovered: [],
+  opened: [], flags: { mirror: false, body: false, identity: false, window: false, memory: false, evidenceChoice: "", metTommy: false, lastNight: false, reassured: false, pressured: false, heardKingfisher: false, lighterReady: false },
   pressure: 0, storyMode: false, morality: 0, status: "playing", actions: 0,
   transcript: INTRO.map((text, index) => ({ id: index + 1, text, kind: index === 0 ? "chapter" : "narration" }))
 };
@@ -49,6 +62,8 @@ export function visibleTargets(state) {
     if (id === "wallet") return state.opened.includes("jacket") && !hasItem(state, "wallet");
     if (id === "matchbook") return !hasItem(state, "matchbook") || state.room === "alley";
     if (id === "towel") return !hasItem(state, "towel");
+    if (id === "lighter") return state.flags.lighterReady && !hasItem(state, "lighter");
+    if (id === "newspaper") return !hasItem(state, "newspaper");
     return true;
   });
 }
@@ -69,6 +84,8 @@ function locationChange(state, room, text) {
 }
 function progress(state, cost = 1) {
   state.actions += 1;
+  // Police pressure belongs to the timed hotel escape, not free-roam Chicago.
+  if (state.chapter !== 1 || !["bathroom", "suite", "escape"].includes(state.room)) return;
   state.pressure += cost;
   if (state.pressure === 9) append(state, "A siren rises somewhere down the block. Not for you. Probably.", "warning");
   if (state.pressure === 17) append(state, "A radio crackles beyond the hotel door. Footsteps. Several sets.", "warning");
@@ -98,6 +115,29 @@ function look(state, target) {
       window: state.flags.window ? "The jammed sash is pried loose. Rain blows through the opening onto an iron fire escape." : "Painted shut and overlooking the alley. A flat-head might free the sash.",
       telephone: "The receiver is off the hook. Nobody is on the line, but someone was here very recently.",
       door: "The hotel corridor. You can hear the elevator machinery turning. Going out that way seems unwise."
+    },
+    street: {
+      newspaper: "ASHWORTH HEIRESS MISSING, THIRD WEEK. The newsboy has gone home. The headlines haven't.",
+      patrol: "Two uniformed officers linger beneath a streetlamp. Both are watching the hotel.",
+      sign: "THE CRIMSON LOUNGE. Red letters bleed into the wet pavement.",
+      door: "A red club door, brass handle, scuffed threshold. Bass notes pulse through the wood.",
+      puddle: "In the rain, the city looks almost honest. The reflections are lying.",
+      agency: "West Lake Street. You recognize a familiar address but can't remember what waits there.",
+      alley: "The fire escape behind the Marmont is disappearing into the fog."
+    },
+    lounge: {
+      tommy: "A bartender with a tired face and nervous hands. Tommy Two-Fingers freezes when he sees you.",
+      bouncer: "The doorman watches the crowd instead of the music. He's definitely seen you before.",
+      bar: "A scarred mahogany counter. Rings of condensation cover the old varnish.",
+      lighter: "Heavy silver lighter. The initials T.T. have been scratched into its lid.",
+      piano: "The pianist plays the same four bars twice. Then deliberately changes the ending.",
+      booth: "A shadowed booth with an empty glass. Someone left in a hurry.",
+      telephone: "An old black telephone behind the bar. No ringing, just the weight of missed calls.",
+      exit: "Beyond the red door is a street that hasn't forgotten your face."
+    },
+    agency: {
+      door: "Your detective agency is locked. This chapter ends at its threshold.",
+      sign: "VINCENT MORROW. PRIVATE INVESTIGATIONS. The letters are almost worn away."
     },
     escape: {
       window: "A yellow square of hotel light behind you. The room already feels like someone else's nightmare.",
@@ -137,6 +177,13 @@ function take(state, target) {
       state.flags.memory = true;
       award(state, "memories", "blue-door", "MEMORY FRAGMENT 01: Rain against a windshield. A woman's whisper: 'Find the blue door.'");
     }
+  } else if (state.room === "street" && target === "newspaper") {
+    award(state, "inventory", "newspaper", "INVENTORY: A damp newspaper clipping.");
+    award(state, "clues", "ashworth-headline", "NOTEBOOK: Eleanor Ashworth, missing for three weeks. Her family wants answers.");
+  } else if (state.room === "lounge" && target === "lighter" && state.flags.lighterReady) {
+    award(state, "inventory", "lighter", "INVENTORY: Tommy's silver lighter, engraved T.T.");
+    award(state, "clues", "lighter-initials", "NOTEBOOK: Engraved lighter given by Tommy Two-Fingers.");
+    award(state, "memories", "kingfisher-whisper", "MEMORY FRAGMENT 02: Tommy's voice, a bruised fist, a name: THE KINGFISHER. Someone offered you Ashworth money to forget.");
   } else if (hasItem(state, target)) {
     append(state, "You already have that.");
   } else {
@@ -147,12 +194,20 @@ function take(state, target) {
 }
 function open(state, target) {
   if (state.room === "bathroom" && target === "cabinet") {
-    if (!state.opened.includes("cabinet")) state.opened.push("cabinet");
+    if (state.opened.includes("cabinet")) {
+      append(state, "The cabinet is already open. No new evidence inside.");
+      return false;
+    }
+    state.opened.push("cabinet");
     append(state, "The cabinet swings open. Inside: an empty aspirin bottle and a loose screwdriver.");
     return true;
   }
   if (state.room === "suite" && target === "jacket") {
-    if (!state.opened.includes("jacket")) state.opened.push("jacket");
+    if (state.opened.includes("jacket")) {
+      append(state, "The jacket has already been searched.");
+      return false;
+    }
+    state.opened.push("jacket");
     append(state, "You search the inner pocket. A leather wallet falls into your hand.");
     return true;
   }
@@ -165,6 +220,16 @@ function open(state, target) {
   return false;
 }
 function use(state, target, item) {
+  if (state.room === "street" && target === "sign" && item === "matchbook" && hasItem(state, "matchbook")) {
+    append(state, "Same red door on the paper as on the building. This is the right place.", "evidence");
+    award(state, "clues", "lounge-match", "NOTEBOOK: The matchbook connects room 214 to the Crimson Lounge.");
+    return true;
+  }
+  if (state.room === "lounge" && target === "bouncer" && item === "matchbook" && hasItem(state, "matchbook")) {
+    append(state, "The bouncer spots the matchbook. 'You're late, Morrow. Tommy is inside.'", "choice");
+    award(state, "clues", "bouncer-recognition", "NOTEBOOK: The club bouncer knows Vincent by name.");
+    return true;
+  }
   if (target === "mirror" && state.room === "bathroom" && item === "towel" && hasItem(state, "towel")) {
     state.flags.mirror = true;
     award(state, "clues", "reflection", "NOTEBOOK: A cut over the right brow. Dried blood. Face unfamiliar.");
@@ -188,6 +253,35 @@ function use(state, target, item) {
   return false;
 }
 function go(state, target) {
+  if (state.room === "alley" && target === "street" && state.chapter >= 2) {
+    locationChange(state, "street", "NEON STREETS. The Crimson Lounge sign burns through the rain.");
+    return true;
+  }
+  if (state.room === "street" && target === "door") {
+    state.dialogue = null;
+    locationChange(state, "lounge", "THE CRIMSON LOUNGE. A saxophone strains above the laughter. The doorman nods. 'Back again, Morrow?'");
+    award(state, "clues", "bouncer-recognition", "NOTEBOOK: The bouncer recognized you before you said a word.");
+    return true;
+  }
+  if (state.room === "street" && target === "alley") {
+    locationChange(state, "alley", "You retreat toward the Marmont fire escape. The police are still searching the area.");
+    return true;
+  }
+  if (state.room === "lounge" && target === "exit") {
+    state.dialogue = null;
+    locationChange(state, "street", "Outside, the rain has doubled. Chicago keeps its secrets under water.");
+    return true;
+  }
+  if (state.room === "street" && target === "agency") {
+    if (!hasItem(state, "lighter")) {
+      append(state, "You could go home, but Tommy has answers. The red door comes first.");
+      return false;
+    }
+    locationChange(state, "agency", "CHAPTER 2 COMPLETE: At 412 West Lake Street, the sign reads VINCENT MORROW, PRIVATE INVESTIGATIONS. Your office has been ransacked. The next case begins at its door.");
+    state.status = "chapter2complete";
+    append(state, "NEXT: CHAPTER 3 — THE AGENCY. Your collected evidence and choices will travel with you.", "ending");
+    return true;
+  }
   if (state.room === "bathroom" && target === "door") {
     locationChange(state, "suite", "ROOM 214. The smell hits first. Cordite. Cheap cologne. A dead man by the window.");
     return true;
@@ -236,6 +330,93 @@ export function chooseEvidence(state, choice) {
   progress(next);
   return next;
 }
+export function continueCase(state) {
+  const next = JSON.parse(JSON.stringify(state));
+  if (next.status !== "escaped" || next.room !== "alley" || next.chapter !== 1) return next;
+  next.status = "playing";
+  next.chapter = 2;
+  next.dialogue = null;
+  next.pressure = 0;
+  locationChange(next, "street", "CHAPTER 2: NEON STREETS. Rain beats the sidewalk. A red sign draws you toward the Crimson Lounge. Somewhere behind you, a patrol car idles.");
+  return next;
+}
+export const TOMMY_OPTIONS = [
+  { id: "last-night", label: "ASK ABOUT LAST NIGHT" },
+  { id: "kingfisher", label: "ASK ABOUT THE KINGFISHER" },
+  { id: "reassure", label: "PROMISE TO PROTECT TOMMY" },
+  { id: "pressure", label: "PRESS HIM FOR ANSWERS" },
+  { id: "close", label: "LEAVE CONVERSATION" }
+];
+export function chooseDialogue(state, choice) {
+  const next = JSON.parse(JSON.stringify(state));
+  if (next.status !== "playing" || next.room !== "lounge" || next.dialogue !== "tommy") return next;
+  if (!TOMMY_OPTIONS.some(option => option.id === choice)) return next;
+  if (choice === "close") {
+    append(next, "Tommy returns to polishing a glass that is already clean.", "choice");
+    next.dialogue = null;
+  } else if (choice === "last-night") {
+    if (next.flags.lastNight) append(next, "'I already told you. You were here with a woman, Vince. You were scared.'", "choice");
+    else {
+      next.flags.lastNight = true;
+      append(next, "'You came in with a woman. A blue coat. You said someone was following her. You left before the last set.'", "choice");
+      award(next, "clues", "tommy-testimony", "NOTEBOOK: Tommy saw Vincent with a woman in a blue coat.");
+      award(next, "memories", "jazz-warning", "MEMORY FRAGMENT: Jazz, a blue coat, a man's shout through the crowd. You remember grabbing a woman's hand.");
+    }
+  } else if (choice === "reassure") {
+    if (next.flags.reassured) append(next, "Tommy looks toward the door. 'Just keep your promise, Vince.'", "choice");
+    else {
+      next.flags.reassured = true; next.rapport = Math.min(3, next.rapport + 1);
+      append(next, "'I won't let them hurt you, Tommy.' He stops shaking. 'That's what you said last time, too.'", "choice");
+    }
+  } else if (choice === "pressure") {
+    if (next.flags.pressured) append(next, "'You got your answer, Vince. Don't make me regret it.'", "choice");
+    else {
+      next.flags.pressured = true; next.rapport = Math.max(-3, next.rapport - 2);
+      append(next, "You lean over the counter. Tommy's knuckles whiten. 'This place has ears, Morrow. Back off.'", "choice");
+    }
+  } else if (choice === "kingfisher") {
+    if (!next.flags.lastNight) {
+      append(next, "'Start with last night. You don't even remember who you came here with.'", "choice");
+      return next;
+    }
+    if (next.rapport < -1) {
+      append(next, "'Not until I know you're on my side.' Tommy turns away. Rebuild his trust.", "choice");
+      return next;
+    }
+    if (!next.flags.heardKingfisher) {
+      next.flags.heardKingfisher = true; next.flags.lighterReady = true;
+      append(next, "Tommy leans close. 'Kingfisher. That's the name you whispered. Then somebody offered you Ashworth money to forget everything.' He slides a silver lighter across the bar.", "choice");
+      award(next, "clues", "kingfisher-lead", "NOTEBOOK: Kingfisher linked to the Ashworth family and Vincent's lost memory.");
+    } else append(next, "'Kingfisher. That's all I know. Take the lighter. Get to your office.'", "choice");
+  }
+  next.actions += 1;
+  return next;
+}
+function talk(state, target) {
+  if (state.room === "street" && target === "patrol") {
+    append(state, "One officer sizes you up. 'Keep walking, buddy.' The second one reaches for his radio.", "warning");
+    return true;
+  }
+  if (state.room === "lounge" && target === "bouncer") {
+    append(state, "'Back again, Morrow? Tommy's inside. Try not to bring trouble through my door.'", "choice");
+    award(state, "clues", "bouncer-recognition", "NOTEBOOK: The club bouncer knows Vincent by name.");
+    return true;
+  }
+  if (state.room === "lounge" && target === "tommy") {
+    state.dialogue = "tommy";
+    if (!state.flags.metTommy) {
+      state.flags.metTommy = true;
+      append(state, "Tommy Two-Fingers nearly drops his glass. 'You shouldn't be here, Vince. Not after what happened.'", "choice");
+    } else append(state, "Tommy glances past your shoulder. 'Make it quick.'", "choice");
+    return true;
+  }
+  if (state.room === "lounge" && target === "piano") {
+    append(state, "The pianist doesn't look up. 'I play requests for cash. Secrets cost more.'", "choice");
+    return true;
+  }
+  append(state, "Nobody here is ready to talk.");
+  return false;
+}
 export function act(state, verb, target, item = "") {
   const next = JSON.parse(JSON.stringify(state));
   if (next.status !== "playing") return next;
@@ -245,7 +426,10 @@ export function act(state, verb, target, item = "") {
       bathroom: "The bathroom is cramped. A mirror. A cabinet. A towel. One door to the rest of your nightmare.",
       suite: "Room 214: a body, your jacket, an ashtray, a telephone, a sealed window. The corridor is getting louder.",
       escape: "A narrow iron landing overlooks a rain-soaked alley. The ladder leads down.",
-      alley: "The night belongs to Chicago. You have to figure out who you belong to."
+      alley: "The night belongs to Chicago. You have to figure out who you belong to.",
+      street: "Rain, a newspaper stand, a passing patrol, and a red door beneath the CRIMSON LOUNGE sign.",
+      lounge: "Amber light, whispered threats, the bartender Tommy, and a jazz pianist playing to a room of strangers.",
+      agency: "The sign above the door reads VINCENT MORROW. The next chapter waits inside."
     }[next.room]);
     return next;
   }
@@ -260,6 +444,7 @@ export function act(state, verb, target, item = "") {
   if (verb === "OPEN") success = open(next, target);
   if (verb === "USE") success = use(next, target, item);
   if (verb === "GO") success = go(next, target);
+  if (verb === "TALK") success = talk(next, target);
   if (success && next.status === "playing") progress(next);
   return next;
 }
@@ -269,12 +454,15 @@ export function setStoryMode(state, enabled) {
   return next;
 }
 export function validateSave(value) {
-  if (!value || value.version !== SAVE_VERSION || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
-  if (!["playing", "caught", "escaped"].includes(value.status)) throw new Error("Invalid case file status.");
+  if (!value || ![1, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
+  if (!["playing", "caught", "escaped", "chapter2complete"].includes(value.status)) throw new Error("Invalid case file status.");
   for (const key of ["inventory", "clues", "memories", "discovered", "opened", "transcript"]) if (!Array.isArray(value[key])) throw new Error("Case file missing " + key);
   if (!value.flags || typeof value.flags !== "object" || typeof value.pressure !== "number") throw new Error("Invalid case file.");
   const safe = initialState();
   safe.room = value.room; safe.status = value.status;
+  safe.chapter = value.chapter === 2 ? 2 : 1;
+  safe.rapport = Number.isFinite(value.rapport) ? Math.max(-3, Math.min(3, value.rapport)) : 0;
+  safe.dialogue = value.dialogue === "tommy" && value.room === "lounge" ? "tommy" : null;
   safe.inventory = value.inventory.filter(x => typeof x === "string").slice(0,50);
   safe.clues = value.clues.filter(x => typeof x === "string").slice(0,80);
   safe.memories = value.memories.filter(x => typeof x === "string").slice(0,80);
