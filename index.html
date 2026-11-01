@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10131c">
+  <meta name="description" content="BLACKOUT: Blood on the Mirror. A retro 1947 Chicago detective mystery.">
+  <title>BLACKOUT | Blood on the Mirror</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./src/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#sceneObjects">Skip to scene objects</a>
+  <main class="shell">
+    <header class="masthead">
+      <div class="kicker">MATCHBOOK GAMES // CASE NO. 001 // CHICAGO, 1947</div>
+      <h1>BLACK<span>OUT</span></h1>
+      <div class="strap">BLOOD ON THE MIRROR <span class="tiny-divider">✦</span> A RETRO NOIR MYSTERY</div>
+    </header>
+    <div class="case-grid">
+      <section class="stage-panel" aria-label="Investigation scene">
+        <div class="panel-head"><span id="roomName">MARMONT HOTEL / BATHROOM</span><span>ROOM 214 <b class="light">● REC</b></span></div>
+        <div class="screen">
+          <canvas id="scene" width="320" height="200" aria-label="Pixel-art depiction of the investigation room" role="img"></canvas>
+          <div class="screen-grain" aria-hidden="true"></div>
+          <div class="film-stamp" id="filmStamp">CHICAGO / 2:13 AM</div>
+        </div>
+        <div class="screen-footer">
+          <span id="objective">OBJECTIVE: FIND OUT WHO YOU ARE</span>
+          <span id="policeStatus">POLICE: DISTANT</span>
+        </div>
+        <div class="command-panel">
+          <div class="eyebrow">YOUR NEXT MOVE <span>KEYS 1–5 SELECT VERB</span></div>
+          <div id="verbs" class="verbs" role="group" aria-label="Choose action"></div>
+          <div class="command-tip" id="commandTip">LOOK selected. Select an object in the scene.</div>
+          <div class="objects-label">OBJECTS IN VIEW</div>
+          <div id="sceneObjects" class="scene-objects" aria-label="Objects in this room"></div>
+        </div>
+        <section class="log-panel" aria-label="Story log">
+          <div class="eyebrow">TRANSCRIPT <span>THE STORY REMEMBERS</span></div>
+          <div id="log" class="log" role="log" aria-live="polite" aria-relevant="additions text"></div>
+          <div id="choicePanel" class="choice-panel" hidden></div>
+        </section>
+      </section>
+      <aside class="sidebar">
+        <div class="case-stamp"><span>CONFIDENTIAL</span><strong>VINCENT MORROW</strong><small>CASE FILE / 1947 / CHICAGO</small></div>
+        <section class="side-panel">
+          <h2>INVENTORY <span id="itemCount">00</span></h2>
+          <p class="panel-help">Select an item, then choose USE and a target.</p>
+          <div id="inventory" class="inventory"></div>
+        </section>
+        <section class="side-panel">
+          <h2>DETECTIVE'S NOTEBOOK <span id="clueCount">00</span></h2>
+          <div id="clues" class="notebook"></div>
+        </section>
+        <section class="side-panel">
+          <h2>MEMORY FRAGMENTS <span id="memoryCount">00</span></h2>
+          <div id="memories" class="notebook"></div>
+        </section>
+        <section class="side-panel tools">
+          <h2>CASE CONTROLS</h2>
+          <label class="toggle"><input type="checkbox" id="storyMode"><span>Story mode (no arrest timer)</span></label>
+          <div class="tool-grid">
+            <button id="exportBtn" type="button">EXPORT CASE</button>
+            <button id="importBtn" type="button">IMPORT CASE</button>
+            <button id="restartBtn" type="button">NEW CASE</button>
+            <a href="https://github.com/MichaelWave369/Blackout" target="_blank" rel="noopener noreferrer">SOURCE CODE ↗</a>
+          </div>
+          <input id="importFile" type="file" accept=".json,application/json" hidden aria-label="Load a saved case file">
+          <p id="fileMessage" class="file-message" role="status"></p>
+        </section>
+      </aside>
+    </div>
+    <footer>BLACKOUT v0.1.0 // THE AWAKENING // ORIGINAL NOIR STORY // LOCAL-FIRST SAVES // <span>EVERY CLUE LEAVES A MARK.</span></footer>
+  </main>
+</body>
+</html>
