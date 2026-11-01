@@ -517,7 +517,7 @@ export function validateSave(value) {
   const safe = initialState();
   safe.room = value.room; safe.status = value.status;
   safe.chapter = [1,2,3,4].includes(value.chapter) ? value.chapter : 1;
-  safe.case3 = safe.chapter === 3 ? sanitizeAgencyCase(value.case3) : null;
+  safe.case3 = safe.chapter >= 3 ? sanitizeAgencyCase(value.case3) : null;
   safe.case4 = safe.chapter === 4 ? sanitizeManorCase(value.case4) : null;
   safe.rapport = Number.isFinite(value.rapport) ? Math.max(-3, Math.min(3, value.rapport)) : 0;
   safe.dialogue = value.dialogue === "tommy" && value.room === "lounge" ? "tommy" : null;
