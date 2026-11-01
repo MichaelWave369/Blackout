@@ -3,18 +3,41 @@
 
 A retro-first, VR-bound 1947 Chicago noir mystery starring private investigator **Vincent Morrow**.
 
+## Rung 2: Neon Streets and the Crimson Lounge (v0.2.0)
+BLACKOUT continues beyond the Marmont escape! Follow the red matchbook into the streets of Chicago and discover how much Tommy Two-Fingers remembers.
+
+**What is new**
+- Three original 320×200 pixel-art scenes: animated neon street, Crimson Lounge interior, and the detective agency exterior.
+- A sixth verb, **TALK** (keyboard **6**), for questioning witnesses and interacting with the world.
+- An atmospheric newspaper stand, police patrol, bouncer, jazz pianist, and a bartender with something to hide.
+- Tommy's multi-step conversation remembers the questions you ask, your promises, and whether you threatened him.
+- Find the Kingfisher lead, collect his engraved lighter, unlock another memory fragment, and reach Vincent's agency to complete Chapter 2.
+- A **CONTINUE TO CHAPTER 2** action appears after escaping the hotel. Previous v1 browser saves and exported JSON case files are upgraded in-place to v2. The browser storage key remains intentionally unchanged.
+- Scene and dialogue systems are kept separate from the case-state engine to support later WebXR development, rather than rewriting the story.
+- Offline PWA cache version updated to ship the new scene module and prevent stale code.
+- The original first chapter remains replayable, with a small fix to stop already-open cabinets repeatedly presenting the same discovery.
+
+**Suggested play path**
+1. Finish the hotel escape and click **CONTINUE TO CHAPTER 2**.
+2. Examine the neon street. TAKE the newspaper for the Ashworth clue, then GO through the red club door.
+3. TALK to Tommy Two-Fingers. Ask about last night, then Kingfisher. Your dialogue choices can make him trust you or clam up.
+4. TAKE the silver lighter after Tommy places it on the bar. Return to the street, then GO to the detective agency.
+5. Export the versioned case file if you want a backup of all your clues and choices.
+
+**Scope:** Chapter 3 stops at the agency door, intentionally. The next rung will build the ransacked office and case-board investigation. The Chapter 2 dialogue is written specifically for this slice; the full BLACKOUT story bible governs later canon review.
+
 ## Rung 1: Blood on the Mirror (v0.1.0)
 An original browser-playable prologue with NES-era point-and-click inspiration, built from vanilla JavaScript and procedural pixel art. No external runtime dependencies or third-party game graphics.
 
-**Play:** Once the PR merges and GitHub Pages is configured with **GitHub Actions** as the publishing source, visit https://michaelwave369.github.io/Blackout/ . Until then, open `index.html` through a local static HTTP server. ES modules will not load reliably from `file://` URLs.
+**Play:** Visit https://michaelwave369.github.io/Blackout/ after the relevant chapter's PR is merged and the Pages workflow succeeds. Alternatively, open `index.html` through a local static HTTP server. ES modules will not load reliably from `file://` URLs.
 
 ### How to play
-- Press **1–5** or click **LOOK / TAKE / OPEN / USE / GO**.
+- Press **1–6** or click **LOOK / TAKE / OPEN / USE / GO / TALK**.
 - Click the illustrated scene or an **OBJECTS IN VIEW** button to target the object.
 - To combine items, click an inventory item. This chooses **USE**; then click its target.
 - Open the medicine cabinet and inspect the jacket. Don't forget the mirror, the victim, and the red matchbook.
 - Get to the fire escape before the police arrive. The **Story mode** toggle removes the arrest deadline for unhurried play.
-- An automatic local browser save follows each action. Export a JSON case file to back it up and import it later; don't trust browser storage across devices.
+- An automatic local browser save follows each action (including conversation choices). Export a JSON case file to back it up and import it later; don't trust browser storage across devices.
 
 ### Prototype features
 - Four rendered scenes: hotel bathroom, room 214, fire escape, rainy alley.
@@ -38,7 +61,7 @@ To run locally, serve the repository directory through any static HTTP server (f
 ## Narrative origin and production
 BLACKOUT began in November 2025 as a first-person noir investigation inspired by the *feel* of classic detective adventures. The original BLACKOUT master design bible remains the story's authority. This prologue uses the *Marmont Hotel* naming provisionally; archive material also uses *Marlow*, so final naming is a separate canon decision.
 
-**Roadmap:** retro prologue → expanded Chicago investigation → complete branching noir case → 3D/Quest 3 XR adaptation, preserving a stable versioned clue and decision schema across modes. This version does **not** yet have a VR client or multiplayer.
+**Roadmap:** retro prologue → Crimson Lounge and witnesses → agency investigation → complete branching noir case → 3D/Quest 3 XR adaptation, preserving a stable versioned clue and decision schema across modes. This version does **not** yet have a VR client or multiplayer.
 
 ### Project structure
 | File | Purpose |
@@ -47,6 +70,7 @@ BLACKOUT began in November 2025 as a first-person noir investigation inspired by
 | `styles.css` | Retro noir visuals and responsive layout |
 | `src/engine.js` | Portable investigation state, puzzle rules, choices, save validation |
 | `src/app.js` | Browser interface, Canvas room art, local persistence, case export/import |
+| `src/chapter2-art.js` | Procedural neon street, lounge, and agency scenes |
 | `sw.js` | Offline app shell |
 | `test/engine.test.mjs` | Native Node tests |
 | `.github/workflows/test.yml` | CI on PRs and pushes |
