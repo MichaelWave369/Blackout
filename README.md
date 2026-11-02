@@ -3,6 +3,33 @@
 
 A retro-first, VR-bound 1947 Chicago noir mystery starring private investigator **Vincent Morrow**.
 
+## Rung 9: The Silhouette Network (v0.9.0)
+
+**Nine connected playable chapters.** Finish The Blue Door and select **CONTINUE TO CHAPTER 9: THE SILHOUETTE NETWORK** under Case Controls. The game preserves prior evidence, memory, inventory, trust decisions and chapter progress.
+
+### New investigation
+- Four original 320×200 procedural pixel-art rooms: Nora's **service foyer**, **cartography gallery**, **interception archive**, and **signal junction**.
+- Meet **Nora Finch**, a former surveillance archivist. Nora's starting trust reflects whether Vincent entrusted Vera with the original film in Chapter 8. The uncut hotel negative authenticates his story and grants archive access even after a hostile interview.
+- In the map gallery, LOOK at the network map, TAKE a route acetate, OPEN the cell-registry drawer, and TAKE the civilian-operator extract.
+- Search the interception archive for the original overnight call log and optional audio spool marked **SABLE**.
+- The signal junction puzzle asks you to reconstruct the **origin → relay → destination** path using the map and call log. The police-dispatch line is a planted decoy; incorrect routes reset without trapping the player.
+- The restored circuit prints the original packet and reveals a live message leading toward a communications tower near **North Canal**. The Silhouette network is compartmentalized; **Kingfisher's ultimate identity remains unknown**.
+- Choose whether to **redact and protect civilian operators** or **follow the live signal**. Separate saved clues affect future chapters.
+
+### Play path
+1. TALK to Nora and show the original surveillance negative to gain access.
+2. GO to cartography. LOOK at the map, TAKE the overlay, OPEN the registry, TAKE the extract.
+3. GO to the interception archive. OPEN the filing cabinet, TAKE the intercept log and optional SABLE reel.
+4. GO to the signal junction. OPEN the routing panel, select each stage in the order supported by both records, and TAKE the original evidence packet.
+5. TALK to the live line. Choose to protect workers or trace the active North Canal transmission.
+
+### Technical continuity
+- Chapter rules in `src/chapter9.js`, original Canvas artwork in `src/chapter9-art.js`, independent shared detective engine and browser UI.
+- The retro six-verb system **LOOK / TAKE / OPEN / USE / GO / TALK** continues with keyboard **1–6**, accessible object buttons, and dialogue/route/finale panels.
+- Save format **v9** imports **v1–v8**; all previous chapter case snapshots, choices and inventory persist. The browser storage key remains unchanged.
+- Offline service worker cache advances to `blackout-silhouette-network-v9`. No runtime package additions or external media.
+- This PR does not contain Chapter 10, an identified Kingfisher, soundtrack, Quest 3 XR or multiplayer. Manual browser playtesting remains recommended.
+
 ## Rung 8: The Blue Door (v0.8.0)
 
 **The mystery from Vincent's first recovered memory is now playable.** After finishing The Old Exchange, choose **CONTINUE TO CHAPTER 8: THE BLUE DOOR** in Case Controls. The engine carries all previous clues, memories, dialogue and branching consequences.
@@ -250,6 +277,8 @@ BLACKOUT began in November 2025 as a first-person noir investigation inspired by
 | `src/chapter7-art.js` | Service lift, concourse, telegraph room and records vault pixel artwork |
 | `src/chapter8.js` | The Blue Door, courier testimony, film splicing and evidence-consequence finale |
 | `src/chapter8-art.js` | Original blue passage, switching office, screening room and observation chamber art |
+| `src/chapter9.js` | Nora Finch conversation, original network route and branch consequences |
+| `src/chapter9-art.js` | Original service foyer, signal map, interception archive and junction scenes |
 | `sw.js` | Offline app shell |
 | `test/engine.test.mjs` | Native Node tests |
 | `.github/workflows/test.yml` | CI on PRs and pushes |

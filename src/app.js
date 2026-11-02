@@ -1,5 +1,5 @@
 import {
-  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, chooseDialogue, TOMMY_OPTIONS,
+  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, chooseDialogue, TOMMY_OPTIONS,
   ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
 } from "./engine.js";
 import { drawChapter2 } from "./chapter2-art.js";
@@ -9,6 +9,8 @@ import { drawWarehouse } from "./chapter5-art.js";
 import { drawRails } from "./chapter6-art.js";
 import { drawExchange } from "./chapter7-art.js";
 import { drawBlueDoor } from "./chapter8-art.js";
+import { drawSilhouette } from "./chapter9-art.js";
+import { NORA_OPTIONS, ROUTER_OPTIONS, SOURCE_OPTIONS, chooseNora, chooseRoute, chooseSource } from "./chapter9.js";
 import { COURIER_OPTIONS as BLUE_COURIER_OPTIONS, SPLICE_OPTIONS, FINALE_OPTIONS, chooseBlueCourier, chooseSplice, chooseBlueFinale } from "./chapter8.js";
 import { MARA_OPTIONS, BOARD_OPTIONS as EXCHANGE_BOARD_OPTIONS, COURIER_OPTIONS, chooseMara, chooseReconciliation, chooseCourier } from "./chapter7.js";
 import { ELSIE_OPTIONS, SWITCH_OPTIONS, EXIT_OPTIONS, chooseElsie, chooseSignal, chooseExchange } from "./chapter6.js";
@@ -224,6 +226,37 @@ Object.assign(descriptions,{
  "vera-original-film":"Vera received the intact original for safekeeping.",
  "solo-original-film":"Vincent concealed his discovery to investigate alone."
 });
+Object.assign(names,{
+  "archive-pass":"Nora's archive pass","cell-registry":"Civilian cell registry",
+  "silhouette-overlay":"Signal route overlay","intercept-log":"Overnight intercept log",
+  "sable-spool":"SABLE audio spool","silhouette-packet":"Routed signal packet",
+  "silhouette-route-map":"Silhouette relay map","silhouette-cell-structure":"Separate network cells",
+  "false-timestamps":"Deliberately altered clocks","north-canal-tower":"Canal communications tower",
+  "cell-operators":"Civilian operators","route-overlay":"Signal overlay",
+  "intercept-chain":"Overnight call chain","sable-call":"SABLE transmission",
+  "north-canal-lead":"North Canal lead","silhouette-memory":"Eleanor's three circles",
+  "nora-cells":"Nora's testimony","nora-authentication":"Authentic hotel film",
+  "silhouette-route-proved":"Proven original signal path","north-canal-message":"Live North Canal message",
+  "shielded-operators":"Operators protected","live-north-canal":"Live signal pursued"
+});
+Object.assign(descriptions,{
+  "silhouette-route-map":"Hotel to Exchange to Riverfront; police dispatch is a decoy.",
+  "silhouette-cell-structure":"Silhouette uses separate cells; Kingfisher remains unidentified.",
+  "false-timestamps":"Network clocks were intentionally unsynchronized.",
+  "north-canal-tower":"A communications tower stands near North Canal.",
+  "cell-operators":"Civilian cell operators were given limited information.",
+  "route-overlay":"Acetate shows the original call network.",
+  "intercept-chain":"Call log confirms the Hotel-Exchange-Riverfront path.",
+  "sable-call":"SABLE is a call sign, not verified as a person's identity.",
+  "north-canal-lead":"Original routed packet points to North Canal.",
+  "silhouette-memory":"Eleanor warns the network's operators cannot identify one another.",
+  "nora-cells":"Nora confirms compartmentalized cells and hidden sponsors.",
+  "nora-authentication":"Nora verifies the uncut hotel recording.",
+  "silhouette-route-proved":"Signal path correctly reconstructed, excluding a police-line decoy.",
+  "north-canal-message":"SABLE's live message directs a vehicle north along the canal.",
+  "shielded-operators":"Vincent protected low-level civilian sources.",
+  "live-north-canal":"Vincent elected to pursue the real-time relay."
+});
 const zones = {
   bathroom: [
     ["mirror", 107, 29, 102, 103], ["cabinet", 22, 43, 69, 92],
@@ -391,6 +424,32 @@ Object.assign(zones,{
   ["door",299,138,21,62]
  ]
 });
+Object.assign(zones,{
+ networkFoyer:[
+   ["emblem",132,13,72,80],["notice",10,18,50,27],
+   ["phone",14,110,85,86],["stairs",0,46,110,110],
+   ["vent",267,11,45,36],["archive",223,46,97,130],
+   ["nora",90,70,61,130]
+ ],
+ mapGallery:[
+   ["index",144,141,161,46],["map",56,14,212,117],
+   ["photo",277,23,42,72],["registry",21,133,113,65],
+   ["sheet",40,150,68,32],["acetate",226,89,40,35],
+   ["foyer",0,18,20,180]
+ ],
+ listenArchive:[
+   ["desk",152,147,114,50],["wire",184,148,40,41],
+   ["cabinet",6,23,124,136],["intercepts",36,71,62,31],
+   ["reel",140,86,126,56],["return",0,162,44,37],
+   ["hatch",267,18,53,181]
+ ],
+ signalJunction:[
+   ["antenna",7,28,28,100],["clock",250,0,63,38],
+   ["mask",221,135,77,65],["panel",22,16,273,116],
+   ["evidence",53,137,118,57],["line",36,139,167,56],
+   ["exit",300,39,20,161]
+ ]
+});
 const palette = {
   bg: "#0b0e1c", tile: "#282735", gold: "#c6a976", blue: "#66858f",
   shadow: "#101320", gray: "#6a6974", red: "#ad3a44",
@@ -545,7 +604,7 @@ function drawAlley() {
   for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
 }
 function drawRain() {
-  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain","exchangeLanding","exchangeHall","wireRoom","exchangeVault","bluePassage","switchOffice","screeningRoom","blueChamber"].includes(state.room))return;
+  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain","exchangeLanding","exchangeHall","wireRoom","exchangeVault","bluePassage","switchOffice","screeningRoom","blueChamber","networkFoyer","mapGallery","listenArchive","signalJunction"].includes(state.room))return;
   for(let i=0;i<47;i++){
     const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
     line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
@@ -564,6 +623,7 @@ function drawScene(){
   else if(["railTunnel","signalCabin","railPlatform","ghostTrain"].includes(room))drawRails(ctx,state,frame);
   else if(["exchangeLanding","exchangeHall","wireRoom","exchangeVault"].includes(room))drawExchange(ctx,state,frame);
   else if(["bluePassage","switchOffice","screeningRoom","blueChamber"].includes(room))drawBlueDoor(ctx,state,frame);
+  else if(["networkFoyer","mapGallery","listenArchive","signalJunction"].includes(room))drawSilhouette(ctx,state,frame);
   else drawChapter2(ctx,state,frame);
   drawRain();
   // cinematic pixel border
@@ -577,9 +637,9 @@ function drawScene(){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
     textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
   }
-  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete","chapter7complete","chapter8complete"].includes(state.status)){
+  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete","chapter7complete","chapter8complete","chapter9complete"].includes(state.status)){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
-    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE","chapter7complete":"CHAPTER 7 COMPLETE","chapter8complete":"CHAPTER 8 COMPLETE"}[state.status];
+    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE","chapter7complete":"CHAPTER 7 COMPLETE","chapter8complete":"CHAPTER 8 COMPLETE","chapter9complete":"CHAPTER 9 COMPLETE"}[state.status];
     textAt(label,62,40,"#f2d092",12);
   }
 }
@@ -615,7 +675,9 @@ function render(){
     exchangeLanding:"EXCHANGE LIFT / 4:57 AM",exchangeHall:"OLD EXCHANGE / 5:02 AM",
     wireRoom:"TELEGRAPH / 5:09 AM",exchangeVault:"RECORDS VAULT / 5:17 AM",
     bluePassage:"BLUE PASSAGE / 5:28 AM",switchOffice:"SWITCH OFFICE / 5:33 AM",
-    screeningRoom:"SCREENING BOOTH / 5:39 AM",blueChamber:"OBSERVATION ROOM B / 5:46 AM"
+    screeningRoom:"SCREENING BOOTH / 5:39 AM",blueChamber:"OBSERVATION ROOM B / 5:46 AM",
+    networkFoyer:"SILHOUETTE FOYER / 5:58 AM",mapGallery:"CARTOGRAPHY / 6:04 AM",
+    listenArchive:"INTERCEPTION ARCHIVE / 6:10 AM",signalJunction:"SIGNAL JUNCTION / 6:18 AM"
   }[state.room];
   $("objective").textContent=state.status==="caught"?"CASE STATUS: ARRESTED":
     state.status==="escaped"?"CHAPTER COMPLETE: CONTINUE BELOW":
@@ -626,6 +688,7 @@ function render(){
     state.status==="chapter6complete"?"CHAPTER COMPLETE: THE OLD EXCHANGE":
     state.status==="chapter7complete"?"CHAPTER COMPLETE: THE BLUE DOOR AWAITS":
     state.status==="chapter8complete"?"CHAPTER COMPLETE: SILHOUETTE NETWORK":
+    state.status==="chapter9complete"?"CHAPTER COMPLETE: NORTH CANAL AWAITS":
     ({bathroom:"OBJECTIVE: RECOVER YOUR IDENTITY",suite:"OBJECTIVE: FIND CLUES AND ESCAPE",
     escape:"OBJECTIVE: DESCEND TO THE ALLEY",alley:"OBJECTIVE: REACH THE CRIMSON LOUNGE",
     street:state.inventory.includes("lighter")?"OBJECTIVE: FIND THE DETECTIVE AGENCY":"OBJECTIVE: ENTER THE CRIMSON LOUNGE",
@@ -651,9 +714,13 @@ function render(){
     bluePassage:state.case8?.reelSolved?"OBJECTIVE: ENTER THE BLUE DOOR":"OBJECTIVE: REBUILD THE SURVEILLANCE REEL",
     switchOffice:"OBJECTIVE: FIND THE ORIGINAL HOTEL PLATE",
     screeningRoom:"OBJECTIVE: RECONSTRUCT THE FILM",
-    blueChamber:"OBJECTIVE: RECOVER ELEANOR'S ORIGINALS"}[state.room]);
+    blueChamber:"OBJECTIVE: RECOVER ELEANOR'S ORIGINALS",
+    networkFoyer:state.case9?.noraAccess?"OBJECTIVE: INVESTIGATE THE SIGNAL NETWORK":"OBJECTIVE: EARN NORA'S TRUST",
+    mapGallery:"OBJECTIVE: RECOVER THE ROUTE MAP AND REGISTRY",
+    listenArchive:"OBJECTIVE: RECOVER THE OVERNIGHT INTERCEPT LOG",
+    signalJunction:state.case9?.routeSolved?"OBJECTIVE: SAVE THE ORIGINAL SIGNAL PACKET":"OBJECTIVE: TRACE THE THREE-STAGE ROUTE"}[state.room]);
   $("policeStatus").textContent=state.status==="caught"?"POLICE: HERE":
-    state.chapter===8?"DANGER: UNDER OBSERVATION":state.chapter===7?"DANGER: ANONYMOUS WATCHERS":state.chapter===6?"DANGER: BELOW THE CITY":state.chapter===5?"DANGER: DOCK WATCH":state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
+    state.chapter===9?"DANGER: NETWORK LISTENING":state.chapter===8?"DANGER: UNDER OBSERVATION":state.chapter===7?"DANGER: ANONYMOUS WATCHERS":state.chapter===6?"DANGER: BELOW THE CITY":state.chapter===5?"DANGER: DOCK WATCH":state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
     state.pressure>=25?"POLICE: AT THE DOOR":state.pressure>=17?"POLICE: APPROACHING":
     state.pressure>=9?"POLICE: SIRENS":"POLICE: DISTANT";
   $("storyMode").checked=state.storyMode;
@@ -664,7 +731,12 @@ function render(){
   $("continueRailsBtn").hidden=!(state.status==="chapter5complete"&&state.room==="containerHold"&&state.chapter===5);
   $("continueExchangeBtn").hidden=!(state.status==="chapter6complete"&&state.room==="ghostTrain"&&state.chapter===6);
   $("continueBlueBtn").hidden=!(state.status==="chapter7complete"&&state.room==="exchangeVault"&&state.chapter===7);
-  $("relationsPanel").hidden=![4,5,6,7,8].includes(state.chapter);
+  $("continueSilhouetteBtn").hidden=!(state.status==="chapter8complete"&&state.room==="blueChamber"&&state.chapter===8);
+  $("relationsPanel").hidden=![4,5,6,7,8,9].includes(state.chapter);
+  if(state.chapter===9&&state.case9){
+    const trust=n=>n>0?"COOPERATIVE":n<0?"WARY":"UNCERTAIN";
+    $("relations").textContent="NORA: "+trust(state.case9.noraTrust)+" · ROUTE: "+state.case9.routeSequence.length+"/3 · SOURCES: "+(state.case9.decision||"PENDING").toUpperCase();
+  }
   if(state.chapter===8&&state.case8){
     const trust=n=>n>0?"COOPERATIVE":n<0?"WARY":"UNCERTAIN";
     $("relations").textContent="COURIER: "+trust(state.case8.courierTrust)+" · REEL: "+state.case8.spliceOrder.length+"/3 · EVIDENCE: "+(state.case8.choice||"PENDING").toUpperCase();
@@ -694,7 +766,8 @@ function render(){
     state.status==="chapter5complete"?"Chapter 5 complete. Continue to THE FORGOTTEN RAILS below.":
     state.status==="chapter6complete"?"Chapter 6 complete. Continue to THE OLD EXCHANGE below.":
     state.status==="chapter7complete"?"Chapter 7 complete. Continue to THE BLUE DOOR below.":
-    state.status==="chapter8complete"?"Chapter 8 complete. The Silhouette trail continues in a later chapter.":
+    state.status==="chapter8complete"?"Chapter 8 complete. Continue to THE SILHOUETTE NETWORK below.":
+    state.status==="chapter9complete"?"Chapter 9 complete. The North Canal awaits in the next chapter.":
     state.status!=="playing"?"Case closed. NEW CASE begins again.":
     verb==="USE"?(item?"USE "+(names[item]||item)+" ON WHAT?":"Choose an inventory item, then choose the target."):
     verb==="TALK"?"Select a person in the scene to question them.":
@@ -757,7 +830,12 @@ function render(){
   const blueCourierPanel=bluePlaying&&state.room==="bluePassage"&&blue?.dialogue==="courier";
   const blueSplicePanel=bluePlaying&&state.room==="screeningRoom"&&blue?.splicePanel&&!blue?.reelSolved;
   const blueFinalePanel=bluePlaying&&state.room==="blueChamber"&&blue?.finalePanel;
-  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel||elsiePanel||switchPanel||exchangePanel||maraPanel||reconciliationPanel||courierPanel||blueCourierPanel||blueSplicePanel||blueFinalePanel);
+  const silhouette=state.case9;
+  const silhouettePlaying=state.chapter===9&&state.status==="playing";
+  const noraPanel=silhouettePlaying&&state.room==="networkFoyer"&&silhouette?.dialogue==="nora";
+  const routingPanel=silhouettePlaying&&state.room==="signalJunction"&&silhouette?.routePanel&&!silhouette.routeSolved;
+  const sourcePanel=silhouettePlaying&&state.room==="signalJunction"&&silhouette?.sourcePanel;
+  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel||elsiePanel||switchPanel||exchangePanel||maraPanel||reconciliationPanel||courierPanel||blueCourierPanel||blueSplicePanel||blueFinalePanel||noraPanel||routingPanel||sourcePanel);
   if(crimeChoice){
     const strong=document.createElement("strong");strong.textContent="A CHOICE: WHAT DO YOU DO WITH THE CRIME SCENE?";choices.appendChild(strong);
     choices.appendChild(makeButton("PRESERVE EVIDENCE",()=>{state=chooseEvidence(state,"preserve");commit();}));
@@ -935,6 +1013,32 @@ function render(){
       state=chooseBlueFinale(state,option.id);commit();
     })));
   }
+  if(noraPanel){
+    const heading=document.createElement("strong");heading.textContent="NORA FINCH / SILHOUETTE ARCHIVIST";choices.appendChild(heading);
+    NORA_OPTIONS.forEach(option=>{
+      const button=makeButton(option.label,()=>{state=chooseNora(state,option.id);commit();});
+      button.disabled=silhouette.noraAsked.includes(option.id);
+      choices.appendChild(button);
+    });
+  }
+  if(routingPanel){
+    const heading=document.createElement("strong");heading.textContent="SILHOUETTE ROUTER / "+silhouette.routeSequence.length+" OF 3 LINKS";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Reconstruct ORIGIN → RELAY → DESTINATION from the map and intercept log; the police dispatch is a decoy. Selected: "+(silhouette.routeSequence.join(" → ").toUpperCase()||"NONE")+".";
+    choices.appendChild(hint);
+    ROUTER_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseRoute(state,option.id);commit();
+    })));
+  }
+  if(sourcePanel){
+    const heading=document.createElement("strong");heading.textContent="LIVE SIGNAL / PROTECT THE SOURCES?";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Preserve the signal packet and civilian registry before deciding whether to protect operators or pursue the live North Canal lead.";
+    choices.appendChild(hint);
+    SOURCE_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseSource(state,option.id);commit();
+    })));
+  }
   drawScene();
 }
 canvas.addEventListener("click",e=>{
@@ -966,6 +1070,7 @@ $("continueWarehouseBtn").addEventListener("click",()=>{state=continueWarehouseC
 $("continueRailsBtn").addEventListener("click",()=>{state=continueRailCase(state);verb="LOOK";item="";commit();});
 $("continueExchangeBtn").addEventListener("click",()=>{state=continueExchangeCase(state);verb="LOOK";item="";commit();});
 $("continueBlueBtn").addEventListener("click",()=>{state=continueBlueCase(state);verb="LOOK";item="";commit();});
+$("continueSilhouetteBtn").addEventListener("click",()=>{state=continueSilhouetteCase(state);verb="LOOK";item="";commit();});
 $("restartBtn").addEventListener("click",()=>{
   if(!window.confirm("Start a new case? The current auto-save will be replaced. Export first if you want to keep it."))return;
   state=initialState();verb="LOOK";item="";$("fileMessage").textContent="Fresh case opened.";commit();
@@ -973,7 +1078,7 @@ $("restartBtn").addEventListener("click",()=>{
 $("exportBtn").addEventListener("click",()=>{
   const content=JSON.stringify(state,null,2);
   const url=URL.createObjectURL(new Blob([content],{type:"application/json"}));
-  const a=document.createElement("a");a.href=url;a.download="blackout-case-v8.json";
+  const a=document.createElement("a");a.href=url;a.download="blackout-case-v9.json";
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
   $("fileMessage").textContent="Case file exported. You can restore it later.";
 });

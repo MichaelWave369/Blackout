@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   initialState, act, chooseEvidence, setStoryMode, validateSave, visibleTargets, SAVE_VERSION,
-  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, chooseDialogue, TOMMY_OPTIONS
+  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, chooseDialogue, TOMMY_OPTIONS
 } from "../src/engine.js";
 import { adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice, BOARD_OPTIONS } from "../src/chapter3.js";
 import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "../src/chapter4.js";
@@ -10,6 +10,7 @@ import { WATCHMAN_OPTIONS, TUNNEL_OPTIONS, chooseWatchman, adjustFreightSeal, su
 import { ELSIE_OPTIONS, SWITCH_OPTIONS, EXIT_OPTIONS, chooseElsie, chooseSignal, chooseExchange } from "../src/chapter6.js";
 import { MARA_OPTIONS, BOARD_OPTIONS as EXCHANGE_BOARD_OPTIONS, COURIER_OPTIONS, chooseMara, chooseReconciliation, chooseCourier } from "../src/chapter7.js";
 import { COURIER_OPTIONS as BLUE_COURIER_OPTIONS, SPLICE_OPTIONS, FINALE_OPTIONS, chooseBlueCourier, chooseSplice, chooseBlueFinale } from "../src/chapter8.js";
+import { NORA_OPTIONS, ROUTER_OPTIONS, SOURCE_OPTIONS, chooseNora, chooseRoute, chooseSource } from "../src/chapter9.js";
 function step(state,verb,target,item="") { return act(state,verb,target,item); }
 function reachSuite(){
   let s=initialState();return step(s,"GO","door");
@@ -1285,4 +1286,229 @@ test("Blue Door malformed save fields are normalized without injection or duplic
  assert.deepEqual(loaded.case8.spliceOrder,[]);
  assert.equal(loaded.case8.dialogue,null);
  assert.equal(loaded.case8.choice,"");
+});
+
+function reachSilhouette(choice="vera"){
+  let s=openBlueDoor(reachBlue());
+  s=step(s,"TAKE","negative");
+  s=step(s,"TAKE","letter");
+  s=step(s,"TALK","telephone");
+  s=chooseBlueFinale(s,choice);
+  assert.equal(s.status,"chapter8complete");
+  s=continueSilhouetteCase(s);
+  assert.equal(s.chapter,9);
+  assert.equal(s.room,"networkFoyer");
+  return s;
+}
+function earnNoraAccess(s){
+  s=step(s,"TALK","nora");
+  s=chooseNora(s,"proof");
+  assert.equal(s.case9.noraAccess,true);
+  assert.ok(s.inventory.includes("archive-pass"));
+  s=chooseNora(s,"close");
+  return s;
+}
+function collectNetworkMap(s){
+  s=step(s,"GO","stairs");
+  assert.equal(s.room,"mapGallery");
+  s=step(s,"LOOK","map");
+  s=step(s,"OPEN","registry");
+  s=step(s,"TAKE","sheet");
+  s=step(s,"TAKE","acetate");
+  assert.ok(s.inventory.includes("cell-registry"));
+  assert.ok(s.inventory.includes("silhouette-overlay"));
+  s=step(s,"GO","foyer");
+  return s;
+}
+function reachSignalBoard(s){
+  s=collectNetworkMap(s);
+  s=earnNoraAccess(s);
+  s=step(s,"GO","archive");
+  assert.equal(s.room,"listenArchive");
+  s=step(s,"OPEN","cabinet");
+  s=step(s,"TAKE","intercepts");
+  s=step(s,"TAKE","reel");
+  assert.ok(s.inventory.includes("intercept-log"));
+  s=step(s,"GO","hatch");
+  assert.equal(s.room,"signalJunction");
+  s=step(s,"OPEN","panel");
+  assert.equal(s.case9.routePanel,true);
+  return s;
+}
+test("Chapter 8 Vera-vs-solo evidence decision affects Nora trust but retains earlier cases",()=>{
+  const vera=reachSilhouette("vera"),solo=reachSilhouette("solo");
+  assert.equal(vera.case9.priorChoice,"vera");
+  assert.equal(solo.case9.priorChoice,"solo");
+  assert.equal(vera.case9.noraTrust,1);
+  assert.equal(solo.case9.noraTrust,0);
+  assert.equal(vera.case8.choice,"vera");
+  assert.equal(solo.case8.choice,"solo");
+  assert.equal(vera.case7.choice,"follow");
+  assert.equal(vera.case6.decision,"warn");
+  assert.equal(vera.case3.boardSolved,true);
+  assert.ok(vera.inventory.includes("original-negative"));
+  assert.equal(continueSilhouetteCase(vera).room,"networkFoyer");
+});
+test("Nora authenticates the uncut hotel film and an accusation cannot permanently block access",()=>{
+  let s=reachSilhouette("solo");
+  s=step(s,"GO","archive");
+  assert.equal(s.room,"networkFoyer");
+  s=step(s,"TALK","nora");
+  assert.equal(NORA_OPTIONS.length,5);
+  s=chooseNora(s,"accuse");
+  assert.equal(s.case9.noraTrust,-2);
+  s=chooseNora(s,"role");
+  assert.ok(s.clues.includes("nora-cells"));
+  s=chooseNora(s,"proof");
+  assert.equal(s.case9.noraTrust,0);
+  assert.equal(s.case9.noraAccess,true);
+  assert.ok(s.clues.includes("nora-authentication"));
+  const count=s.inventory.length;
+  s=chooseNora(s,"proof");
+  assert.equal(s.inventory.length,count);
+  s=chooseNora(s,"close");
+  s=step(s,"GO","archive");
+  assert.equal(s.room,"listenArchive");
+});
+test("Cartography gallery exposes independent map, acetate and registry clues",()=>{
+  let s=reachSilhouette();
+  s=step(s,"GO","stairs");
+  assert.equal(s.room,"mapGallery");
+  assert.equal(visibleTargets(s).some(([id])=>id==="sheet"),false);
+  s=step(s,"TAKE","sheet");
+  assert.ok(!s.inventory.includes("cell-registry"));
+  s=step(s,"LOOK","map");
+  s=step(s,"OPEN","registry");
+  s=step(s,"TAKE","sheet");
+  s=step(s,"TAKE","acetate");
+  assert.ok(s.clues.includes("silhouette-route-map"));
+  assert.ok(s.clues.includes("cell-operators"));
+  assert.ok(s.clues.includes("route-overlay"));
+  assert.equal(visibleTargets(s).some(([id])=>id==="sheet"),false);
+});
+test("Signal routing cannot start until both original overlay and intercept log exist",()=>{
+  let s=earnNoraAccess(reachSilhouette());
+  s=step(s,"GO","archive");
+  s=step(s,"GO","hatch");
+  s=step(s,"OPEN","panel");
+  assert.equal(s.case9.routePanel,false);
+  s=step(s,"GO","exit");
+  s=step(s,"OPEN","cabinet");
+  s=step(s,"TAKE","intercepts");
+  s=step(s,"GO","hatch");
+  s=step(s,"OPEN","panel");
+  assert.equal(s.case9.routePanel,false,"overlay is required");
+  s=step(s,"GO","exit");
+  s=step(s,"GO","return");
+  s=collectNetworkMap(s);
+  s=step(s,"GO","archive");
+  s=step(s,"GO","hatch");
+  s=step(s,"OPEN","panel");
+  assert.equal(s.case9.routePanel,true);
+});
+test("Incorrect police-dispatch signal route resets; Hotel-Exchange-Riverfront path unlocks packet",()=>{
+  let s=reachSignalBoard(reachSilhouette());
+  assert.equal(ROUTER_OPTIONS.length,5);
+  s=chooseRoute(s,"police");
+  assert.deepEqual(s.case9.routeSequence,[]);
+  s=chooseRoute(s,"hotel");
+  assert.deepEqual(s.case9.routeSequence,["hotel"]);
+  s=chooseRoute(s,"river");
+  assert.deepEqual(s.case9.routeSequence,[]);
+  s=chooseRoute(s,"hotel");
+  s=chooseRoute(s,"exchange");
+  s=chooseRoute(s,"river");
+  assert.equal(s.case9.routeSolved,true);
+  assert.deepEqual(s.case9.routeSequence,["hotel","exchange","river"]);
+  assert.ok(s.clues.includes("silhouette-route-proved"));
+  assert.equal(visibleTargets(s).some(([id])=>id==="evidence"),true);
+});
+test("Original packet and live SABLE line provide a lead, not a false Kingfisher identity",()=>{
+  let s=reachSignalBoard(reachSilhouette());
+  for(const id of ["hotel","exchange","river"])s=chooseRoute(s,id);
+  s=step(s,"LOOK","mask");
+  s=step(s,"LOOK","clock");
+  s=step(s,"TAKE","evidence");
+  s=step(s,"TALK","line");
+  assert.equal(s.case9.transmissionHeard,true);
+  assert.equal(s.case9.sourcePanel,true);
+  assert.ok(s.clues.includes("north-canal-lead"));
+  assert.ok(s.clues.includes("north-canal-message"));
+  assert.ok(s.clues.includes("silhouette-cell-structure"));
+  assert.ok(s.memories.includes("silhouette-memory"));
+  assert.ok(s.transcript.some(x=>x.text.includes("No named suspect")));
+});
+test("Source protection vs live pursuit are distinct evidence-gated endings",()=>{
+  let s=reachSignalBoard(reachSilhouette("solo"));
+  for(const id of ["hotel","exchange","river"])s=chooseRoute(s,id);
+  s=step(s,"TALK","line");
+  assert.equal(s.case9.sourcePanel,true);
+  s=chooseSource(s,"shield");
+  assert.equal(s.status,"playing","original packet required");
+  s=step(s,"TAKE","evidence");
+  assert.equal(SOURCE_OPTIONS.length,3);
+  const shield=chooseSource(s,"shield"),trace=chooseSource(s,"trace");
+  assert.equal(shield.status,"chapter9complete");
+  assert.equal(trace.status,"chapter9complete");
+  assert.equal(shield.case9.decision,"shield");
+  assert.equal(trace.case9.decision,"trace");
+  assert.ok(shield.clues.includes("shielded-operators"));
+  assert.ok(trace.clues.includes("live-north-canal"));
+  assert.equal(step(shield,"GO","exit").status,"chapter9complete");
+  assert.deepEqual(shield.inventory,trace.inventory);
+});
+test("A missing civilian registry blocks source decision until it is recovered",()=>{
+  let s=reachSignalBoard(reachSilhouette());
+  s.inventory=s.inventory.filter(id=>id!=="cell-registry");
+  s.case9.registryTaken=false;
+  for(const id of ["hotel","exchange","river"])s=chooseRoute(s,id);
+  s=step(s,"TAKE","evidence");
+  s=step(s,"TALK","line");
+  s=chooseSource(s,"trace");
+  assert.equal(s.status,"playing");
+  s=step(s,"GO","exit");
+  s=step(s,"GO","return");
+  s=step(s,"GO","stairs");
+  s=step(s,"OPEN","registry");
+  s=step(s,"TAKE","sheet");
+  assert.ok(s.inventory.includes("cell-registry"));
+  s=step(s,"GO","foyer");
+  s=step(s,"GO","archive");
+  s=step(s,"GO","hatch");
+  s=step(s,"TALK","line");
+  s=chooseSource(s,"trace");
+  assert.equal(s.status,"chapter9complete");
+});
+test("v9 save imports v1-v8 cases with chapter snapshots and partial signal state intact",()=>{
+  let s=reachSignalBoard(reachSilhouette("solo"));
+  s=chooseRoute(s,"hotel");
+  const restored=validateSave(JSON.parse(JSON.stringify(s)));
+  assert.equal(restored.version,SAVE_VERSION);
+  assert.equal(restored.chapter,9);
+  assert.deepEqual(restored.case9.routeSequence,["hotel"]);
+  assert.equal(restored.case8.choice,"solo");
+  assert.equal(restored.case7.choice,"follow");
+  assert.equal(restored.case6.decision,"warn");
+  assert.ok(restored.inventory.includes("intercept-log"));
+  for(let version=1;version<=8;version++){
+    const legacy={...initialState(),version};
+    delete legacy.case9;
+    const migrated=validateSave(legacy);
+    assert.equal(migrated.version,SAVE_VERSION);
+    assert.equal(migrated.chapter,1);
+  }
+});
+test("malformed Silhouette imported state clamps trust, drops unknown options and invalid paths",()=>{
+  let s=reachSignalBoard(reachSilhouette());
+  s.case9.noraTrust=888;
+  s.case9.noraAsked=["bad","proof","proof","accuse"];
+  s.case9.routeSequence=["police","hotel","river"];
+  s.case9.dialogue="unsafe";
+  s.case9.decision="inject";
+  const loaded=validateSave(s);
+  assert.equal(loaded.case9.noraTrust,3);
+  assert.deepEqual(loaded.case9.noraAsked,["proof","accuse"]);
+  assert.deepEqual(loaded.case9.routeSequence,[]);
+  assert.equal(loaded.case9.dialogue,null);
+  assert.equal(loaded.case9.decision,"");
 });
