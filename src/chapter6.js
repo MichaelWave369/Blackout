@@ -26,6 +26,7 @@ export const RAIL_HOTSPOTS={
 export const ELSIE_OPTIONS=[
  {id:"ask",label:"ASK ABOUT THE BLACK K TRAIN"},
  {id:"reassure",label:"PROMISE TO PROTECT ELSIE"},
+ {id:"show-proof",label:"SHOW ELEANOR'S WIRE RECORDING"},
  {id:"accuse",label:"ACCUSE ELSIE OF HELPING KINGFISHER"},
  {id:"close",label:"END INTERVIEW"}
 ];
@@ -238,6 +239,15 @@ export function chooseElsie(state,choice){
   }else if(choice==="accuse"){
     c.elsieTrust=Math.max(-3,c.elsieTrust-2);
     say(s,"'You knew they were shipping people.' She looks away. 'And now you think I'm one of them.'","choice");
+  }else if(choice==="show-proof"){
+    if(!s.inventory.includes("wire-recording")){
+      say(s,"You need Eleanor's actual recording to convince Elsie.","warning");
+      c.elsieAsked=c.elsieAsked.filter(x=>x!==choice);
+    }else{
+      c.elsieTrust=Math.max(0,c.elsieTrust);
+      award(s,"clues","elsie-hears-eleanor","NOTEBOOK: Elsie recognized Eleanor's voice on the dockside wire recording.");
+      say(s,"You play the recording. Elsie's face changes. 'That's her. I heard her that night. You really are trying to help.'","choice");
+    }
   }else if(choice==="ask"){
     if(!s.inventory.includes("black-k-chip")){
       say(s,"'Find the black K passmark. Then maybe we'll talk.'","warning");
