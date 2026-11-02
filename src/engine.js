@@ -8,7 +8,8 @@ import { BLUE_HOTSPOTS, freshBlueCase, blueTargets, blueAction, sanitizeBlueCase
 import { SILHOUETTE_HOTSPOTS, freshSilhouetteCase, silhouetteTargets, silhouetteAction, sanitizeSilhouetteCase } from "./chapter9.js";
 import { CANAL_HOTSPOTS, freshCanalCase, canalTargets, canalAction, sanitizeCanalCase } from "./chapter10.js";
 import { LANTERN_HOTSPOTS, freshLanternCase, lanternTargets, lanternAction, sanitizeLanternCase } from "./chapter11.js";
-export const SAVE_VERSION = 11;
+import { ALIBI_HOTSPOTS, freshAlibiCase, alibiTargets, alibiAction, sanitizeAlibiCase } from "./chapter12.js";
+export const SAVE_VERSION = 12;
 export const STORAGE_KEY = "blackout-blood-on-the-mirror-v1";
 export const VERBS = ["LOOK", "TAKE", "OPEN", "USE", "GO", "TALK"];
 export const ROOM_NAMES = {
@@ -52,7 +53,11 @@ export const ROOM_NAMES = {
   lanternLanding: "LANTERN HOUSE / CANAL LANDING",
   lanternGreenhouse: "LANTERN HOUSE / GREENHOUSE",
   lanternControl: "LANTERN HOUSE / SECURITY CONTROL",
-  eleanorWard: "LANTERN HOUSE / OBSERVATION WARD"
+  eleanorWard: "LANTERN HOUSE / OBSERVATION WARD",
+  safehouse: "SAFEHOUSE / ELEANOR'S ROOM",
+  hotelAnnex: "MARMONT / RECORDS ANNEX",
+  coronerOffice: "MUNICIPAL / CORONER'S ANNEX",
+  reconstructionDesk: "PRIVATE OFFICE / THE LAST ALIBI"
 };
 export const HOTSPOTS = {
   bathroom: [
@@ -91,7 +96,8 @@ export const HOTSPOTS = {
   ...BLUE_HOTSPOTS,
   ...SILHOUETTE_HOTSPOTS,
   ...CANAL_HOTSPOTS,
-  ...LANTERN_HOTSPOTS
+  ...LANTERN_HOTSPOTS,
+  ...ALIBI_HOTSPOTS
 };
 export const INTRO = [
   "CHICAGO. 1947. 2:13 A.M.",
@@ -100,7 +106,7 @@ export const INTRO = [
 ];
 const BASE = {
   version: SAVE_VERSION,
-  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, case3: null, case4: null, case5: null, case6: null, case7: null, case8: null, case9: null, case10: null, case11: null, inventory: [], clues: [], memories: [], discovered: [],
+  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, case3: null, case4: null, case5: null, case6: null, case7: null, case8: null, case9: null, case10: null, case11: null, case12: null, inventory: [], clues: [], memories: [], discovered: [],
   opened: [], flags: { mirror: false, body: false, identity: false, window: false, memory: false, evidenceChoice: "", metTommy: false, lastNight: false, reassured: false, pressured: false, heardKingfisher: false, lighterReady: false },
   pressure: 0, storyMode: false, morality: 0, status: "playing", actions: 0,
   transcript: INTRO.map((text, index) => ({ id: index + 1, text, kind: index === 0 ? "chapter" : "narration" }))
@@ -118,6 +124,7 @@ export function visibleTargets(state) {
   if (state.chapter === 9 && SILHOUETTE_HOTSPOTS[state.room]) return silhouetteTargets(state);
   if (state.chapter === 10 && CANAL_HOTSPOTS[state.room]) return canalTargets(state);
   if (state.chapter === 11 && LANTERN_HOTSPOTS[state.room]) return lanternTargets(state);
+  if (state.chapter === 12 && ALIBI_HOTSPOTS[state.room]) return alibiTargets(state);
   return (HOTSPOTS[state.room] || []).filter(([id]) => {
     if (id === "screwdriver") return state.opened.includes("cabinet") && !hasItem(state, "screwdriver");
     if (id === "wallet") return state.opened.includes("jacket") && !hasItem(state, "wallet");
@@ -554,10 +561,27 @@ export function continueLanternCase(state){
   locationChange(next,"lanternLanding","CHAPTER 11: LANTERN HOUSE. At dawn, Vincent reaches the guarded recovery ward by the canal. Ada Reed waits at the service gate. Inside may be Eleanor Ashworth herself.");
   return next;
 }
+export function continueAlibiCase(state){
+  const next=JSON.parse(JSON.stringify(state));
+  if(next.chapter!==11||next.status!=="chapter11complete"||next.room!=="eleanorWard")return next;
+  next.chapter=12;next.status="playing";next.dialogue=null;
+  next.case12=freshAlibiCase(next.case11?.decision);
+  locationChange(next,"safehouse","CHAPTER 12: THE LAST ALIBI. Eleanor and Vincent return to the evidence. A lost hotel guest record, an uncut street camera negative, and the municipal coroner's records could prove who died in room 214.");
+  return next;
+}
 export function act(state, verb, target, item = "") {
   const next = JSON.parse(JSON.stringify(state));
   if (next.status !== "playing") return next;
   if (!VERBS.includes(verb)) return next;
+  if(next.chapter===12&&ALIBI_HOTSPOTS[next.room]){
+    if(verb!=="LOOK"||target){
+      if(!visibleTargets(next).some(([id])=>id===target)){
+        append(next,"That isn't here. Keep looking.");
+        return next;
+      }
+    }
+    return alibiAction(next,verb,target,item);
+  }
   if(next.chapter===11&&LANTERN_HOTSPOTS[next.room]){
     if(verb!=="LOOK"||target){
       if(!visibleTargets(next).some(([id])=>id===target)){
@@ -681,7 +705,11 @@ export function act(state, verb, target, item = "") {
       lanternLanding: "Ada Reed stands near a service gate while the front hall remains under guard.",
       lanternGreenhouse: "A frost-glass greenhouse holds the service survey and tide card.",
       lanternControl: "Security files and an evacuation plan can lead to the observation ward.",
-      eleanorWard: "Eleanor Ashworth is alive inside Lantern House. Her testimony and other detainees' register remain here."
+      eleanorWard: "Eleanor Ashworth is alive inside Lantern House. Her testimony and other detainees' register remain here.",
+      safehouse: "Eleanor and Vincent revisit the Marmont case through independent evidence.",
+      hotelAnnex: "The original Marmont guest, desk clock and effects records still survive.",
+      coronerOffice: "Independent coroner files may identify the man in room 214.",
+      reconstructionDesk: "An original three-part evidence board can reconstruct Vincent's alibi."
     }[next.room]);
     return next;
   }
@@ -706,13 +734,13 @@ export function setStoryMode(state, enabled) {
   return next;
 }
 export function validateSave(value) {
-  if (!value || ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
-  if (!["playing", "caught", "escaped", "chapter2complete", "chapter3complete", "chapter4complete", "chapter5complete", "chapter6complete", "chapter7complete", "chapter8complete", "chapter9complete", "chapter10complete", "chapter11complete"].includes(value.status)) throw new Error("Invalid case file status.");
+  if (!value || ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
+  if (!["playing", "caught", "escaped", "chapter2complete", "chapter3complete", "chapter4complete", "chapter5complete", "chapter6complete", "chapter7complete", "chapter8complete", "chapter9complete", "chapter10complete", "chapter11complete", "chapter12complete"].includes(value.status)) throw new Error("Invalid case file status.");
   for (const key of ["inventory", "clues", "memories", "discovered", "opened", "transcript"]) if (!Array.isArray(value[key])) throw new Error("Case file missing " + key);
   if (!value.flags || typeof value.flags !== "object" || typeof value.pressure !== "number") throw new Error("Invalid case file.");
   const safe = initialState();
   safe.room = value.room; safe.status = value.status;
-  safe.chapter = [1,2,3,4,5,6,7,8,9,10,11].includes(value.chapter) ? value.chapter : 1;
+  safe.chapter = [1,2,3,4,5,6,7,8,9,10,11,12].includes(value.chapter) ? value.chapter : 1;
   safe.case3 = safe.chapter >= 3 ? sanitizeAgencyCase(value.case3) : null;
   safe.case4 = safe.chapter >= 4 ? sanitizeManorCase(value.case4) : null;
   safe.case5 = safe.chapter >= 5 ? sanitizeWarehouseCase(value.case5) : null;
@@ -721,7 +749,8 @@ export function validateSave(value) {
   safe.case8 = safe.chapter >= 8 ? sanitizeBlueCase(value.case8) : null;
   safe.case9 = safe.chapter >= 9 ? sanitizeSilhouetteCase(value.case9) : null;
   safe.case10 = safe.chapter >= 10 ? sanitizeCanalCase(value.case10) : null;
-  safe.case11 = safe.chapter === 11 ? sanitizeLanternCase(value.case11) : null;
+  safe.case11 = safe.chapter >= 11 ? sanitizeLanternCase(value.case11) : null;
+  safe.case12 = safe.chapter === 12 ? sanitizeAlibiCase(value.case12) : null;
   safe.rapport = Number.isFinite(value.rapport) ? Math.max(-3, Math.min(3, value.rapport)) : 0;
   safe.dialogue = value.dialogue === "tommy" && value.room === "lounge" ? "tommy" : null;
   safe.inventory = value.inventory.filter(x => typeof x === "string").slice(0,50);
