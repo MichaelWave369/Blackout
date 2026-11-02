@@ -6,7 +6,8 @@ import { RAIL_HOTSPOTS, freshRailCase, railTargets, railAction, sanitizeRailCase
 import { EXCHANGE_HOTSPOTS, freshExchangeCase, exchangeTargets, exchangeAction, sanitizeExchangeCase } from "./chapter7.js";
 import { BLUE_HOTSPOTS, freshBlueCase, blueTargets, blueAction, sanitizeBlueCase } from "./chapter8.js";
 import { SILHOUETTE_HOTSPOTS, freshSilhouetteCase, silhouetteTargets, silhouetteAction, sanitizeSilhouetteCase } from "./chapter9.js";
-export const SAVE_VERSION = 9;
+import { CANAL_HOTSPOTS, freshCanalCase, canalTargets, canalAction, sanitizeCanalCase } from "./chapter10.js";
+export const SAVE_VERSION = 10;
 export const STORAGE_KEY = "blackout-blood-on-the-mirror-v1";
 export const VERBS = ["LOOK", "TAKE", "OPEN", "USE", "GO", "TALK"];
 export const ROOM_NAMES = {
@@ -42,7 +43,11 @@ export const ROOM_NAMES = {
   networkFoyer: "SILHOUETTE / SERVICE FOYER",
   mapGallery: "SILHOUETTE / CARTOGRAPHY GALLERY",
   listenArchive: "SILHOUETTE / INTERCEPTION ARCHIVE",
-  signalJunction: "SILHOUETTE / SIGNAL JUNCTION"
+  signalJunction: "SILHOUETTE / SIGNAL JUNCTION",
+  canalWalk: "NORTH CANAL / TOWPATH",
+  relayHut: "NORTH CANAL / RELAY HUT",
+  bargeDeck: "NORTH CANAL / TRANSFER BARGE",
+  towerControl: "NORTH CANAL / TRANSMITTER CONTROL"
 };
 export const HOTSPOTS = {
   bathroom: [
@@ -79,7 +84,8 @@ export const HOTSPOTS = {
   ...RAIL_HOTSPOTS,
   ...EXCHANGE_HOTSPOTS,
   ...BLUE_HOTSPOTS,
-  ...SILHOUETTE_HOTSPOTS
+  ...SILHOUETTE_HOTSPOTS,
+  ...CANAL_HOTSPOTS
 };
 export const INTRO = [
   "CHICAGO. 1947. 2:13 A.M.",
@@ -88,7 +94,7 @@ export const INTRO = [
 ];
 const BASE = {
   version: SAVE_VERSION,
-  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, case3: null, case4: null, case5: null, case6: null, case7: null, case8: null, case9: null, inventory: [], clues: [], memories: [], discovered: [],
+  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, case3: null, case4: null, case5: null, case6: null, case7: null, case8: null, case9: null, case10: null, inventory: [], clues: [], memories: [], discovered: [],
   opened: [], flags: { mirror: false, body: false, identity: false, window: false, memory: false, evidenceChoice: "", metTommy: false, lastNight: false, reassured: false, pressured: false, heardKingfisher: false, lighterReady: false },
   pressure: 0, storyMode: false, morality: 0, status: "playing", actions: 0,
   transcript: INTRO.map((text, index) => ({ id: index + 1, text, kind: index === 0 ? "chapter" : "narration" }))
@@ -104,6 +110,7 @@ export function visibleTargets(state) {
   if (state.chapter === 7 && EXCHANGE_HOTSPOTS[state.room]) return exchangeTargets(state);
   if (state.chapter === 8 && BLUE_HOTSPOTS[state.room]) return blueTargets(state);
   if (state.chapter === 9 && SILHOUETTE_HOTSPOTS[state.room]) return silhouetteTargets(state);
+  if (state.chapter === 10 && CANAL_HOTSPOTS[state.room]) return canalTargets(state);
   return (HOTSPOTS[state.room] || []).filter(([id]) => {
     if (id === "screwdriver") return state.opened.includes("cabinet") && !hasItem(state, "screwdriver");
     if (id === "wallet") return state.opened.includes("jacket") && !hasItem(state, "wallet");
@@ -524,10 +531,27 @@ export function continueSilhouetteCase(state){
   locationChange(next,"networkFoyer","CHAPTER 9: THE SILHOUETTE NETWORK. Behind the Blue Door lies a network of watchers. Nora Finch guards an archive that might lead to the person directing it.");
   return next;
 }
+export function continueCanalCase(state){
+  const next=JSON.parse(JSON.stringify(state));
+  if(next.chapter!==9||next.status!=="chapter9complete"||next.room!=="signalJunction")return next;
+  next.chapter=10;next.status="playing";next.dialogue=null;
+  next.case10=freshCanalCase(next.case9?.decision);
+  locationChange(next,"canalWalk","CHAPTER 10: NORTH CANAL. A live SABLE transmission leads Vincent to a rain-soaked towpath, an abandoned transfer barge, and a communications tower. Iris Pike watches him arrive.");
+  return next;
+}
 export function act(state, verb, target, item = "") {
   const next = JSON.parse(JSON.stringify(state));
   if (next.status !== "playing") return next;
   if (!VERBS.includes(verb)) return next;
+  if(next.chapter===10&&CANAL_HOTSPOTS[next.room]){
+    if(verb!=="LOOK"||target){
+      if(!visibleTargets(next).some(([id])=>id===target)){
+        append(next,"That isn't here. Keep looking.");
+        return next;
+      }
+    }
+    return canalAction(next,verb,target,item);
+  }
   if(next.chapter===9&&SILHOUETTE_HOTSPOTS[next.room]){
     if(verb!=="LOOK"||target){
       if(!visibleTargets(next).some(([id])=>id===target)){
@@ -625,7 +649,11 @@ export function act(state, verb, target, item = "") {
       networkFoyer: "An operator named Nora Finch guards the hidden Silhouette interception archive.",
       mapGallery: "A sprawling map of disconnected signal cells traces Hotel, Exchange, and Riverfront relays.",
       listenArchive: "Intercept logs and the audio spool marked SABLE lie inside a sealed archive.",
-      signalJunction: "A routing board can trace the network to the North Canal communications tower."
+      signalJunction: "A routing board can trace the network to the North Canal communications tower.",
+      canalWalk: "A canal radio engineer watches a relay hut, a moored barge and the transmission tower.",
+      relayHut: "Original calibration records and traffic logs can prove which route SABLE used.",
+      bargeDeck: "The barge's transfer records hold a destination that might explain Eleanor's disappearance.",
+      towerControl: "The North Canal router can print the original path and relay a live message."
     }[next.room]);
     return next;
   }
@@ -650,20 +678,21 @@ export function setStoryMode(state, enabled) {
   return next;
 }
 export function validateSave(value) {
-  if (!value || ![1, 2, 3, 4, 5, 6, 7, 8, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
-  if (!["playing", "caught", "escaped", "chapter2complete", "chapter3complete", "chapter4complete", "chapter5complete", "chapter6complete", "chapter7complete", "chapter8complete", "chapter9complete"].includes(value.status)) throw new Error("Invalid case file status.");
+  if (!value || ![1, 2, 3, 4, 5, 6, 7, 8, 9, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
+  if (!["playing", "caught", "escaped", "chapter2complete", "chapter3complete", "chapter4complete", "chapter5complete", "chapter6complete", "chapter7complete", "chapter8complete", "chapter9complete", "chapter10complete"].includes(value.status)) throw new Error("Invalid case file status.");
   for (const key of ["inventory", "clues", "memories", "discovered", "opened", "transcript"]) if (!Array.isArray(value[key])) throw new Error("Case file missing " + key);
   if (!value.flags || typeof value.flags !== "object" || typeof value.pressure !== "number") throw new Error("Invalid case file.");
   const safe = initialState();
   safe.room = value.room; safe.status = value.status;
-  safe.chapter = [1,2,3,4,5,6,7,8,9].includes(value.chapter) ? value.chapter : 1;
+  safe.chapter = [1,2,3,4,5,6,7,8,9,10].includes(value.chapter) ? value.chapter : 1;
   safe.case3 = safe.chapter >= 3 ? sanitizeAgencyCase(value.case3) : null;
   safe.case4 = safe.chapter >= 4 ? sanitizeManorCase(value.case4) : null;
   safe.case5 = safe.chapter >= 5 ? sanitizeWarehouseCase(value.case5) : null;
   safe.case6 = safe.chapter >= 6 ? sanitizeRailCase(value.case6) : null;
   safe.case7 = safe.chapter >= 7 ? sanitizeExchangeCase(value.case7) : null;
   safe.case8 = safe.chapter >= 8 ? sanitizeBlueCase(value.case8) : null;
-  safe.case9 = safe.chapter === 9 ? sanitizeSilhouetteCase(value.case9) : null;
+  safe.case9 = safe.chapter >= 9 ? sanitizeSilhouetteCase(value.case9) : null;
+  safe.case10 = safe.chapter === 10 ? sanitizeCanalCase(value.case10) : null;
   safe.rapport = Number.isFinite(value.rapport) ? Math.max(-3, Math.min(3, value.rapport)) : 0;
   safe.dialogue = value.dialogue === "tommy" && value.room === "lounge" ? "tommy" : null;
   safe.inventory = value.inventory.filter(x => typeof x === "string").slice(0,50);
