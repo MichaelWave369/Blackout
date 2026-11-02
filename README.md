@@ -3,6 +3,34 @@
 
 A retro-first, VR-bound 1947 Chicago noir mystery starring private investigator **Vincent Morrow**.
 
+## Rung 5: Warehouse Shadows (v0.5.0)
+
+**A fifth playable chapter extends the BLACKOUT noir mystery.** Finish Ashworth Manor, make your decision with Vera, and select **CONTINUE TO CHAPTER 5: WAREHOUSE SHADOWS** in the case controls. Your earlier findings, dialogue, trust and agency case file carry forward.
+
+### Investigate the South Branch docks
+- Explore four new original procedural pixel-art scenes: the **dock gate**, **loading bay**, **freight dispatch office**, and **sealed cargo container**.
+- Show the night watchman the **black K chip** you recovered from Ashworth Manor to get past the chained gate. His initial trust reflects the decision you made about Vera and Harold. The watchman has additional dialogue options that further change his disposition.
+- Search the dispatcher office: OPEN the old filing cabinet, TAKE a secret freight manifest, and optionally question the harbor radio for an illegal-shipment clue.
+- Examine the freight container's three-digit seal. The manifest and environmental clues identify the code in the order **QUAY / SHIFT / BAY**. Set the three wheel controls and release the cargo seal.
+- Inspect the concealed passenger hold. Discover a **wire recording marked E.A.**, a secret **transfer roster** and an optional **burned barge photograph**.
+- Near the service tunnel, choose how to handle the original records and whether to protect witness identities. Both choices yield different persistent clues and will matter in future chapters.
+- The closing scene leads toward **the old city rail yards**, preserving the mystery of the Kingfisher's identity for later.
+
+### Controls and compatibility
+- Commands **LOOK / TAKE / OPEN / USE / GO / TALK** remain available by mouse or keyboard **1–6**. Every puzzle also has labeled buttons and object-list hotspots.
+- Freight-seal dials have accessible increment/decrement controls and expose the story hint from the manifest.
+- Pure deterministic chapter rules live in `src/chapter5.js`. Original 320×200 scenes live in `src/chapter5-art.js`, separate from the shared case engine and browser interface.
+- The versioned save format is **v5**, accepting v1 through v4 saves. Previous chapter inventory, trust outcomes, memories, and completed evidence-board state remain available.
+- Offline cache advances to `blackout-warehouse-v5` and includes the new game files. No runtime packages or external graphics required.
+- **No Quest 3 VR mode or production audio yet**; those will be separate future implementations.
+
+### Chapter 5 play path
+1. TALK to the night watchman, reveal the black K passmark, and GO through the gate.
+2. GO to the freight office. OPEN the cabinet and TAKE the freight manifest.
+3. Return to the loading bay and OPEN the cargo container. Dial the three digits given by the QUAY / SHIFT / BAY records, then release the seal.
+4. GO into the container. TAKE the recorder and passenger roster. OPEN the crate for a photograph.
+5. GO toward the service tunnel and choose how to handle the evidence to finish Chapter 5.
+
 ## Rung 4: Ashworth Manor (v0.4.0)
 
 **Vincent Morrow's fourth chapter is playable.** Finish the Agency investigation and answer Vera's call, then choose **CONTINUE TO CHAPTER 4: ASHWORTH MANOR** in Case Controls. All prior clues, memories, trust, moral choices and inventory carry forward.
@@ -118,7 +146,7 @@ To run locally, serve the repository directory through any static HTTP server (f
 ## Narrative origin and production
 BLACKOUT began in November 2025 as a first-person noir investigation inspired by the *feel* of classic detective adventures. The original BLACKOUT master design bible remains the story's authority. This prologue uses the *Marmont Hotel* naming provisionally; archive material also uses *Marlow*, so final naming is a separate canon decision.
 
-**Roadmap:** retro prologue → Crimson Lounge and witnesses → ransacked agency investigation → Ashworth Manor → Warehouse District → complete branching noir case → 3D/Quest 3 XR adaptation, preserving a stable versioned clue and decision schema across modes. This version does **not** yet have a VR client or multiplayer.
+**Roadmap:** retro prologue → Crimson Lounge and witnesses → ransacked agency investigation → Ashworth Manor → Warehouse Shadows → old city rail yards → complete branching noir case → 3D/Quest 3 XR adaptation, preserving a stable versioned clue and decision schema across modes. This version does **not** yet have a VR client or multiplayer.
 
 ### Project structure
 | File | Purpose |
@@ -132,6 +160,8 @@ BLACKOUT began in November 2025 as a first-person noir investigation inspired by
 | `src/chapter3-art.js` | Original ransacked office and records-room pixel art |
 | `src/chapter4.js` | Ashworth Manor, Harold and Vera dialogue, portrait puzzle, branching consequences |
 | `src/chapter4-art.js` | Original mansion gate, foyer, bedroom and study scenes |
+| `src/chapter5.js` | Dockside witness interaction, freight seal, and evidence-choice state |
+| `src/chapter5-art.js` | Original night dock, loading bay, dispatch office, and freight hold art |
 | `sw.js` | Offline app shell |
 | `test/engine.test.mjs` | Native Node tests |
 | `.github/workflows/test.yml` | CI on PRs and pushes |

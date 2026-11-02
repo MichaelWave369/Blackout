@@ -1,10 +1,12 @@
 import {
-  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, chooseDialogue, TOMMY_OPTIONS,
+  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, chooseDialogue, TOMMY_OPTIONS,
   ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
 } from "./engine.js";
 import { drawChapter2 } from "./chapter2-art.js";
 import { drawAgencyChapter } from "./chapter3-art.js";
 import { drawManor } from "./chapter4-art.js";
+import { drawWarehouse } from "./chapter5-art.js";
+import { WATCHMAN_OPTIONS, TUNNEL_OPTIONS, chooseWatchman, adjustFreightSeal, submitFreightSeal, chooseTunnel } from "./chapter5.js";
 import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "./chapter4.js";
 import { BOARD_OPTIONS, adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice } from "./chapter3.js";
 
@@ -103,6 +105,33 @@ Object.assign(descriptions,{
   "public-confrontation":"Vincent confronted Harold with Vera still present.",
   "private-confrontation":"Vincent allowed Vera to leave before questioning Harold."
 });
+Object.assign(names,{
+ "freight-manifest":"Freight manifest","wire-recording":"Eleanor recording",
+ "transfer-roster":"Passenger roster","burned-photo":"Burned barge photo",
+ "warehouse-quay":"Quay Four","warehouse-shift":"First tide shift",
+ "warehouse-seal-bay":"Bay Seven","warehouse-shipment":"Unregistered transfer",
+ "kingfisher-docks":"Kingfisher dock pass","watchman-tip":"Watchman lead",
+ "protected-barge":"Protected barge","warehouse-opened":"Freight seal opened",
+ "eleanor-voice":"Eleanor wire message","warehouse-voice":"Eleanor's voice",
+ "eleanor-transfer":"Eleanor transfer record","barge-photo":"Burned photo",
+ "protected-witness":"Protected witnesses","public-record":"Public copies"
+});
+Object.assign(descriptions,{
+ "warehouse-quay":"The dock notice says Quay Four.",
+ "warehouse-shift":"The crane's first shift bell bears a ONE.",
+ "warehouse-seal-bay":"The freight container is marked Bay Seven.",
+ "warehouse-shipment":"An unregistered passenger transfer appears on the manifest.",
+ "kingfisher-docks":"The K chip unlocks access to a hidden dockside operation.",
+ "watchman-tip":"An unregistered transfer is concealed in the warehouse office.",
+ "protected-barge":"The harbor radio is concealing a barge.",
+ "warehouse-opened":"Three-digit freight seal opened from shipping records.",
+ "eleanor-voice":"Eleanor describes being moved by Kingfisher associates.",
+ "warehouse-voice":"Eleanor calls out to Vincent through static.",
+ "eleanor-transfer":"The roster places Eleanor on a secret passenger shipment.",
+ "barge-photo":"A photo shows Eleanor boarding a clandestine barge.",
+ "protected-witness":"Vincent kept the originals and shielded worker identities.",
+ "public-record":"Vincent left copies for investigators, risking information leaks."
+});
 const zones = {
   bathroom: [
     ["mirror", 107, 29, 102, 103], ["cabinet", 22, 43, 69, 92],
@@ -172,6 +201,30 @@ const zones = {
     ["diary",216,127,46,26],["foyerdoor",294,24,26,176]
   ]
 };
+Object.assign(zones,{
+ dockGate:[
+  ["watchman",8,74,55,126],["poster",65,120,29,48],
+  ["sign",158,174,150,25],["gate",95,61,218,110],
+  ["water",122,187,180,13],["truck",145,83,111,59]
+ ],
+ loadingBay:[
+  ["office",1,64,94,84],["container",119,47,190,123],
+  ["crane",18,10,198,69],["stencil",254,73,65,34],
+  ["door",0,157,92,42],["rail",114,168,195,32],["lamp",89,22,22,22]
+ ],
+ freightOffice:[
+  ["cabinet",12,30,112,117],["manifest",28,70,80,39],
+  ["radio",150,100,58,36],["desk",126,131,173,69],
+  ["photo",263,19,56,52],["window",148,17,101,91],
+  ["door",303,65,17,120]
+ ],
+ containerHold:[
+  ["recorder",128,92,104,43],["roster",224,127,62,43],
+  ["crate",9,137,106,63],["photo",41,148,41,31],
+  ["vent",250,15,65,65],["tunnel",247,68,72,129],
+  ["door",0,40,18,96]
+ ]
+});
 const palette = {
   bg: "#0b0e1c", tile: "#282735", gold: "#c6a976", blue: "#66858f",
   shadow: "#101320", gray: "#6a6974", red: "#ad3a44",
@@ -326,7 +379,7 @@ function drawAlley() {
   for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
 }
 function drawRain() {
-  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate"].includes(state.room))return;
+  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay"].includes(state.room))return;
   for(let i=0;i<47;i++){
     const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
     line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
@@ -341,6 +394,7 @@ function drawScene(){
   else if(room==="alley")drawAlley();
   else if(room==="office"||room==="archive")drawAgencyChapter(ctx,state,frame);
   else if(["manorGate","manorFoyer","manorStudy","eleanorRoom"].includes(room))drawManor(ctx,state,frame);
+  else if(["dockGate","loadingBay","freightOffice","containerHold"].includes(room))drawWarehouse(ctx,state,frame);
   else drawChapter2(ctx,state,frame);
   drawRain();
   // cinematic pixel border
@@ -354,9 +408,9 @@ function drawScene(){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
     textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
   }
-  if(["chapter2complete","chapter3complete","chapter4complete"].includes(state.status)){
+  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete"].includes(state.status)){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
-    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE"}[state.status];
+    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE"}[state.status];
     textAt(label,62,40,"#f2d092",12);
   }
 }
@@ -384,13 +438,16 @@ function render(){
     street:"CHICAGO / 2:34 AM",lounge:"THE CRIMSON LOUNGE / 2:41 AM",agency:"WEST LAKE ST / 3:02 AM",
     office:"MORROW AGENCY / 3:09 AM",archive:"RECORDS ROOM / 3:16 AM",
     manorGate:"ASHWORTH ESTATE / 11:53 PM",manorFoyer:"ASHWORTH FOYER / 12:02 AM",
-    eleanorRoom:"ELEANOR'S ROOM / 12:11 AM",manorStudy:"ASHWORTH STUDY / 12:15 AM"
+    eleanorRoom:"ELEANOR'S ROOM / 12:11 AM",manorStudy:"ASHWORTH STUDY / 12:15 AM",
+    dockGate:"SOUTH BRANCH / 3:54 AM",loadingBay:"DOCK BAY / 4:03 AM",
+    freightOffice:"DISPATCH / 4:09 AM",containerHold:"K-417 / 4:16 AM"
   }[state.room];
   $("objective").textContent=state.status==="caught"?"CASE STATUS: ARRESTED":
     state.status==="escaped"?"CHAPTER COMPLETE: CONTINUE BELOW":
     state.status==="chapter2complete"?"CHAPTER COMPLETE: THE AGENCY AWAITS":
     state.status==="chapter3complete"?"CHAPTER COMPLETE: ASHWORTH MANOR AT MIDNIGHT":
     state.status==="chapter4complete"?"CHAPTER COMPLETE: SHADOWS IN THE WAREHOUSE":
+    state.status==="chapter5complete"?"CHAPTER COMPLETE: THE OLD CITY RAIL YARDS":
     ({bathroom:"OBJECTIVE: RECOVER YOUR IDENTITY",suite:"OBJECTIVE: FIND CLUES AND ESCAPE",
     escape:"OBJECTIVE: DESCEND TO THE ALLEY",alley:"OBJECTIVE: REACH THE CRIMSON LOUNGE",
     street:state.inventory.includes("lighter")?"OBJECTIVE: FIND THE DETECTIVE AGENCY":"OBJECTIVE: ENTER THE CRIMSON LOUNGE",
@@ -400,16 +457,25 @@ function render(){
     manorGate:"OBJECTIVE: ENTER ASHWORTH MANOR",
     manorFoyer:"OBJECTIVE: QUESTION HAROLD, EXPLORE THE MANOR",
     eleanorRoom:"OBJECTIVE: UNCOVER ELEANOR'S SECRETS",
-    manorStudy:state.case4?.veraAppeared?"OBJECTIVE: SPEAK TO VERA":"OBJECTIVE: UNCOVER THE BLACK K"}[state.room]);
+    manorStudy:state.case4?.veraAppeared?"OBJECTIVE: SPEAK TO VERA":"OBJECTIVE: UNCOVER THE BLACK K",
+    dockGate:"OBJECTIVE: TALK TO THE NIGHT WATCHMAN",
+    loadingBay:state.case5?.sealOpen?"OBJECTIVE: ENTER THE CONTAINER":"OBJECTIVE: FIND THE SHIPPING CODE",
+    freightOffice:"OBJECTIVE: RECOVER THE FREIGHT MANIFEST",
+    containerHold:"OBJECTIVE: FOLLOW ELEANOR'S TRANSFER"}[state.room]);
   $("policeStatus").textContent=state.status==="caught"?"POLICE: HERE":
-    state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
+    state.chapter===5?"DANGER: DOCK WATCH":state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
     state.pressure>=25?"POLICE: AT THE DOOR":state.pressure>=17?"POLICE: APPROACHING":
     state.pressure>=9?"POLICE: SIRENS":"POLICE: DISTANT";
   $("storyMode").checked=state.storyMode;
   $("continueBtn").hidden=!(state.status==="escaped"&&state.room==="alley"&&state.chapter===1);
   $("continueAgencyBtn").hidden=!(state.status==="chapter2complete"&&state.room==="agency"&&state.chapter===2);
   $("continueManorBtn").hidden=!(state.status==="chapter3complete"&&state.room==="office"&&state.chapter===3);
-  $("relationsPanel").hidden=state.chapter!==4;
+  $("continueWarehouseBtn").hidden=!(state.status==="chapter4complete"&&state.room==="manorStudy"&&state.chapter===4);
+  $("relationsPanel").hidden=![4,5].includes(state.chapter);
+  if(state.chapter===5&&state.case5){
+    const trust=n=>n>0?"COOPERATIVE":n<0?"WARY":"UNCERTAIN";
+    $("relations").textContent="DOCK WATCHMAN: "+trust(state.case5.watchmanTrust)+" · EVIDENCE: "+(state.case5.decision||"PENDING").toUpperCase();
+  }
   if(state.chapter===4&&state.case4){
     const trust=n=>n>0?"TRUSTING":n<0?"STRAINED":"UNCERTAIN";
     $("relations").textContent="HAROLD: "+trust(state.case4.haroldTrust)+" · VERA: "+trust(state.case4.veraTrust);
@@ -419,7 +485,8 @@ function render(){
   $("commandTip").textContent=state.status==="escaped"?"Chapter 1 complete. Use CONTINUE TO CHAPTER 2 below.":
     state.status==="chapter2complete"?"Chapter 2 complete. Continue to the agency from the CASE CONTROLS.":
     state.status==="chapter3complete"?"Chapter 3 complete. Continue to ASHWORTH MANOR below.":
-    state.status==="chapter4complete"?"Chapter 4 complete. The Warehouse District awaits in a future update.":
+    state.status==="chapter4complete"?"Chapter 4 complete. Continue to WAREHOUSE SHADOWS below.":
+    state.status==="chapter5complete"?"Chapter 5 complete. The rail yards await in a future update.":
     state.status!=="playing"?"Case closed. NEW CASE begins again.":
     verb==="USE"?(item?"USE "+(names[item]||item)+" ON WHAT?":"Choose an inventory item, then choose the target."):
     verb==="TALK"?"Select a person in the scene to question them.":
@@ -462,7 +529,12 @@ function render(){
   const haroldPanel=manorPlaying&&state.room==="manorFoyer"&&manor?.dialogue==="harold";
   const veraPanel=manorPlaying&&state.room==="manorStudy"&&manor?.dialogue==="vera";
   const portraitPanel=manorPlaying&&state.room==="manorStudy"&&manor?.portraitPanel&&!manor?.portraitUnlocked;
-  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel);
+  const warehouse=state.case5;
+  const warehousePlaying=state.chapter===5&&state.status==="playing";
+  const watchmanPanel=warehousePlaying&&state.room==="dockGate"&&warehouse?.dialogue==="watchman";
+  const sealPanel=warehousePlaying&&state.room==="loadingBay"&&warehouse?.sealPanel&&!warehouse?.sealOpen;
+  const tunnelPanel=warehousePlaying&&state.room==="containerHold"&&warehouse?.tunnelPanel;
+  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel);
   if(crimeChoice){
     const strong=document.createElement("strong");strong.textContent="A CHOICE: WHAT DO YOU DO WITH THE CRIME SCENE?";choices.appendChild(strong);
     choices.appendChild(makeButton("PRESERVE EVIDENCE",()=>{state=chooseEvidence(state,"preserve");commit();}));
@@ -533,6 +605,37 @@ function render(){
       state=choosePortrait(state,option.id);commit();
     })));
   }
+  if(watchmanPanel){
+    const heading=document.createElement("strong");heading.textContent="NIGHT WATCHMAN / DOCKSIDE INTERVIEW";choices.appendChild(heading);
+    WATCHMAN_OPTIONS.forEach(option=>{
+      const button=makeButton(option.label,()=>{state=chooseWatchman(state,option.id);commit();});
+      button.disabled=warehouse.watchmanAsked.includes(option.id);choices.appendChild(button);
+    });
+  }
+  if(sealPanel){
+    const heading=document.createElement("strong");heading.textContent="FREIGHT SEAL / QUAY • SHIFT • BAY";
+    choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Find the manifest in the dispatch office. The wheels follow QUAY / SHIFT / BAY.";
+    choices.appendChild(hint);
+    const dials=document.createElement("div");dials.className="safe-dials";
+    ["QUAY","SHIFT","BAY"].forEach((label,i)=>{
+      const col=document.createElement("div");col.className="safe-dial";
+      const cap=document.createElement("span");cap.textContent=label;col.appendChild(cap);
+      col.appendChild(makeButton("▲",()=>{state=adjustFreightSeal(state,i,1);commit();},{"aria-label":"Increase "+label+" digit"}));
+      const out=document.createElement("output");out.textContent=String(warehouse.sealDigits[i]);col.appendChild(out);
+      col.appendChild(makeButton("▼",()=>{state=adjustFreightSeal(state,i,-1);commit();},{"aria-label":"Decrease "+label+" digit"}));
+      dials.appendChild(col);
+    });
+    choices.appendChild(dials);
+    choices.appendChild(makeButton("RELEASE FREIGHT SEAL",()=>{state=submitFreightSeal(state);commit();}));
+  }
+  if(tunnelPanel){
+    const heading=document.createElement("strong");heading.textContent="SERVICE TUNNEL / CHOOSE WHAT TO PROTECT";choices.appendChild(heading);
+    TUNNEL_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseTunnel(state,option.id);commit();
+    })));
+  }
   drawScene();
 }
 canvas.addEventListener("click",e=>{
@@ -560,6 +663,7 @@ $("storyMode").addEventListener("change",e=>{state=setStoryMode(state,e.target.c
 $("continueBtn").addEventListener("click",()=>{state=continueCase(state);verb="LOOK";item="";commit();});
 $("continueAgencyBtn").addEventListener("click",()=>{state=continueAgencyCase(state);verb="LOOK";item="";commit();});
 $("continueManorBtn").addEventListener("click",()=>{state=continueManorCase(state);verb="LOOK";item="";commit();});
+$("continueWarehouseBtn").addEventListener("click",()=>{state=continueWarehouseCase(state);verb="LOOK";item="";commit();});
 $("restartBtn").addEventListener("click",()=>{
   if(!window.confirm("Start a new case? The current auto-save will be replaced. Export first if you want to keep it."))return;
   state=initialState();verb="LOOK";item="";$("fileMessage").textContent="Fresh case opened.";commit();
@@ -567,7 +671,7 @@ $("restartBtn").addEventListener("click",()=>{
 $("exportBtn").addEventListener("click",()=>{
   const content=JSON.stringify(state,null,2);
   const url=URL.createObjectURL(new Blob([content],{type:"application/json"}));
-  const a=document.createElement("a");a.href=url;a.download="blackout-case-v4.json";
+  const a=document.createElement("a");a.href=url;a.download="blackout-case-v5.json";
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
   $("fileMessage").textContent="Case file exported. You can restore it later.";
 });
