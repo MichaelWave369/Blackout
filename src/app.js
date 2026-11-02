@@ -613,7 +613,9 @@ function render(){
     railTunnel:"RAIL TUNNEL / 4:25 AM",signalCabin:"SIGNAL CABIN / 4:33 AM",
     railPlatform:"PLATFORM ZERO / 4:38 AM",ghostTrain:"CAR 09 / 4:46 AM",
     exchangeLanding:"EXCHANGE LIFT / 4:57 AM",exchangeHall:"OLD EXCHANGE / 5:02 AM",
-    wireRoom:"TELEGRAPH / 5:09 AM",exchangeVault:"RECORDS VAULT / 5:17 AM"
+    wireRoom:"TELEGRAPH / 5:09 AM",exchangeVault:"RECORDS VAULT / 5:17 AM",
+    bluePassage:"BLUE PASSAGE / 5:28 AM",switchOffice:"SWITCH OFFICE / 5:33 AM",
+    screeningRoom:"SCREENING BOOTH / 5:39 AM",blueChamber:"OBSERVATION ROOM B / 5:46 AM"
   }[state.room];
   $("objective").textContent=state.status==="caught"?"CASE STATUS: ARRESTED":
     state.status==="escaped"?"CHAPTER COMPLETE: CONTINUE BELOW":
@@ -623,6 +625,7 @@ function render(){
     state.status==="chapter5complete"?"CHAPTER COMPLETE: THE OLD CITY RAIL YARDS":
     state.status==="chapter6complete"?"CHAPTER COMPLETE: THE OLD EXCHANGE":
     state.status==="chapter7complete"?"CHAPTER COMPLETE: THE BLUE DOOR AWAITS":
+    state.status==="chapter8complete"?"CHAPTER COMPLETE: SILHOUETTE NETWORK":
     ({bathroom:"OBJECTIVE: RECOVER YOUR IDENTITY",suite:"OBJECTIVE: FIND CLUES AND ESCAPE",
     escape:"OBJECTIVE: DESCEND TO THE ALLEY",alley:"OBJECTIVE: REACH THE CRIMSON LOUNGE",
     street:state.inventory.includes("lighter")?"OBJECTIVE: FIND THE DETECTIVE AGENCY":"OBJECTIVE: ENTER THE CRIMSON LOUNGE",
@@ -644,9 +647,13 @@ function render(){
     exchangeLanding:"OBJECTIVE: ENTER THE OLD EXCHANGE",
     exchangeHall:state.case7?.vaultKey?"OBJECTIVE: ENTER THE RECORDS VAULT":"OBJECTIVE: QUESTION MARA BELL",
     wireRoom:"OBJECTIVE: FIND THE ORIGINAL DISPATCH COPIES",
-    exchangeVault:state.case7?.boardSolved?"OBJECTIVE: RECOVER WEBB'S CONTRACT":"OBJECTIVE: RECONCILE THE EVIDENCE"}[state.room]);
+    exchangeVault:state.case7?.boardSolved?"OBJECTIVE: RECOVER WEBB'S CONTRACT":"OBJECTIVE: RECONCILE THE EVIDENCE",
+    bluePassage:state.case8?.reelSolved?"OBJECTIVE: ENTER THE BLUE DOOR":"OBJECTIVE: REBUILD THE SURVEILLANCE REEL",
+    switchOffice:"OBJECTIVE: FIND THE ORIGINAL HOTEL PLATE",
+    screeningRoom:"OBJECTIVE: RECONSTRUCT THE FILM",
+    blueChamber:"OBJECTIVE: RECOVER ELEANOR'S ORIGINALS"}[state.room]);
   $("policeStatus").textContent=state.status==="caught"?"POLICE: HERE":
-    state.chapter===7?"DANGER: ANONYMOUS WATCHERS":state.chapter===6?"DANGER: BELOW THE CITY":state.chapter===5?"DANGER: DOCK WATCH":state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
+    state.chapter===8?"DANGER: UNDER OBSERVATION":state.chapter===7?"DANGER: ANONYMOUS WATCHERS":state.chapter===6?"DANGER: BELOW THE CITY":state.chapter===5?"DANGER: DOCK WATCH":state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
     state.pressure>=25?"POLICE: AT THE DOOR":state.pressure>=17?"POLICE: APPROACHING":
     state.pressure>=9?"POLICE: SIRENS":"POLICE: DISTANT";
   $("storyMode").checked=state.storyMode;
@@ -656,7 +663,12 @@ function render(){
   $("continueWarehouseBtn").hidden=!(state.status==="chapter4complete"&&state.room==="manorStudy"&&state.chapter===4);
   $("continueRailsBtn").hidden=!(state.status==="chapter5complete"&&state.room==="containerHold"&&state.chapter===5);
   $("continueExchangeBtn").hidden=!(state.status==="chapter6complete"&&state.room==="ghostTrain"&&state.chapter===6);
-  $("relationsPanel").hidden=![4,5,6,7].includes(state.chapter);
+  $("continueBlueBtn").hidden=!(state.status==="chapter7complete"&&state.room==="exchangeVault"&&state.chapter===7);
+  $("relationsPanel").hidden=![4,5,6,7,8].includes(state.chapter);
+  if(state.chapter===8&&state.case8){
+    const trust=n=>n>0?"COOPERATIVE":n<0?"WARY":"UNCERTAIN";
+    $("relations").textContent="COURIER: "+trust(state.case8.courierTrust)+" · REEL: "+state.case8.spliceOrder.length+"/3 · EVIDENCE: "+(state.case8.choice||"PENDING").toUpperCase();
+  }
   if(state.chapter===7&&state.case7){
     const trust=n=>n>0?"COOPERATIVE":n<0?"WARY":"UNCERTAIN";
     $("relations").textContent="MARA: "+trust(state.case7.maraTrust)+" · RECONCILED: "+state.case7.boardLinks.length+"/3 · COURIER: "+(state.case7.choice||"PENDING").toUpperCase();
@@ -681,7 +693,8 @@ function render(){
     state.status==="chapter4complete"?"Chapter 4 complete. Continue to WAREHOUSE SHADOWS below.":
     state.status==="chapter5complete"?"Chapter 5 complete. Continue to THE FORGOTTEN RAILS below.":
     state.status==="chapter6complete"?"Chapter 6 complete. Continue to THE OLD EXCHANGE below.":
-    state.status==="chapter7complete"?"Chapter 7 complete. The Blue Door will open in a later chapter.":
+    state.status==="chapter7complete"?"Chapter 7 complete. Continue to THE BLUE DOOR below.":
+    state.status==="chapter8complete"?"Chapter 8 complete. The Silhouette trail continues in a later chapter.":
     state.status!=="playing"?"Case closed. NEW CASE begins again.":
     verb==="USE"?(item?"USE "+(names[item]||item)+" ON WHAT?":"Choose an inventory item, then choose the target."):
     verb==="TALK"?"Select a person in the scene to question them.":
@@ -739,7 +752,12 @@ function render(){
   const maraPanel=exPlaying&&state.room==="exchangeHall"&&ex?.dialogue==="mara";
   const reconciliationPanel=exPlaying&&state.room==="exchangeVault"&&ex?.boardPanel&&!ex.boardSolved;
   const courierPanel=exPlaying&&state.room==="exchangeVault"&&ex?.dialogue==="courier";
-  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel||elsiePanel||switchPanel||exchangePanel||maraPanel||reconciliationPanel||courierPanel);
+  const blue=state.case8;
+  const bluePlaying=state.chapter===8&&state.status==="playing";
+  const blueCourierPanel=bluePlaying&&state.room==="bluePassage"&&blue?.dialogue==="courier";
+  const blueSplicePanel=bluePlaying&&state.room==="screeningRoom"&&blue?.splicePanel&&!blue?.reelSolved;
+  const blueFinalePanel=bluePlaying&&state.room==="blueChamber"&&blue?.finalePanel;
+  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel||elsiePanel||switchPanel||exchangePanel||maraPanel||reconciliationPanel||courierPanel||blueCourierPanel||blueSplicePanel||blueFinalePanel);
   if(crimeChoice){
     const strong=document.createElement("strong");strong.textContent="A CHOICE: WHAT DO YOU DO WITH THE CRIME SCENE?";choices.appendChild(strong);
     choices.appendChild(makeButton("PRESERVE EVIDENCE",()=>{state=chooseEvidence(state,"preserve");commit();}));
@@ -892,6 +910,31 @@ function render(){
       state=chooseCourier(state,option.id);commit();
     })));
   }
+  if(blueCourierPanel){
+    const heading=document.createElement("strong");heading.textContent="THE COURIER / BLUE PASSAGE";choices.appendChild(heading);
+    BLUE_COURIER_OPTIONS.forEach(option=>{
+      const button=makeButton(option.label,()=>{state=chooseBlueCourier(state,option.id);commit();});
+      button.disabled=blue.courierAsked.includes(option.id);choices.appendChild(button);
+    });
+  }
+  if(blueSplicePanel){
+    const heading=document.createElement("strong");heading.textContent="FILM RECONSTRUCTION / "+blue.spliceOrder.length+" OF 3 STRIPS";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="The handling card gives the film's sequence. Selected: "+(blue.spliceOrder.join(" → ").toUpperCase()||"NONE")+".";
+    choices.appendChild(hint);
+    SPLICE_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseSplice(state,option.id);commit();
+    })));
+  }
+  if(blueFinalePanel){
+    const heading=document.createElement("strong");heading.textContent="THE ORIGINAL FILM / WHO CAN BE TRUSTED?";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Protect the uncut negative and Eleanor's original letter. The decision will follow Vincent into the next chapter.";
+    choices.appendChild(hint);
+    FINALE_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseBlueFinale(state,option.id);commit();
+    })));
+  }
   drawScene();
 }
 canvas.addEventListener("click",e=>{
@@ -922,6 +965,7 @@ $("continueManorBtn").addEventListener("click",()=>{state=continueManorCase(stat
 $("continueWarehouseBtn").addEventListener("click",()=>{state=continueWarehouseCase(state);verb="LOOK";item="";commit();});
 $("continueRailsBtn").addEventListener("click",()=>{state=continueRailCase(state);verb="LOOK";item="";commit();});
 $("continueExchangeBtn").addEventListener("click",()=>{state=continueExchangeCase(state);verb="LOOK";item="";commit();});
+$("continueBlueBtn").addEventListener("click",()=>{state=continueBlueCase(state);verb="LOOK";item="";commit();});
 $("restartBtn").addEventListener("click",()=>{
   if(!window.confirm("Start a new case? The current auto-save will be replaced. Export first if you want to keep it."))return;
   state=initialState();verb="LOOK";item="";$("fileMessage").textContent="Fresh case opened.";commit();
@@ -929,7 +973,7 @@ $("restartBtn").addEventListener("click",()=>{
 $("exportBtn").addEventListener("click",()=>{
   const content=JSON.stringify(state,null,2);
   const url=URL.createObjectURL(new Blob([content],{type:"application/json"}));
-  const a=document.createElement("a");a.href=url;a.download="blackout-case-v7.json";
+  const a=document.createElement("a");a.href=url;a.download="blackout-case-v8.json";
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
   $("fileMessage").textContent="Case file exported. You can restore it later.";
 });
