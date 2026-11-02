@@ -2,12 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   initialState, act, chooseEvidence, setStoryMode, validateSave, visibleTargets, SAVE_VERSION,
-  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, chooseDialogue, TOMMY_OPTIONS
+  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, chooseDialogue, TOMMY_OPTIONS
 } from "../src/engine.js";
 import { adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice, BOARD_OPTIONS } from "../src/chapter3.js";
 import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "../src/chapter4.js";
 import { WATCHMAN_OPTIONS, TUNNEL_OPTIONS, chooseWatchman, adjustFreightSeal, submitFreightSeal, chooseTunnel } from "../src/chapter5.js";
 import { ELSIE_OPTIONS, SWITCH_OPTIONS, EXIT_OPTIONS, chooseElsie, chooseSignal, chooseExchange } from "../src/chapter6.js";
+import { MARA_OPTIONS, BOARD_OPTIONS as EXCHANGE_BOARD_OPTIONS, COURIER_OPTIONS, chooseMara, chooseReconciliation, chooseCourier } from "../src/chapter7.js";
 function step(state,verb,target,item="") { return act(state,verb,target,item); }
 function reachSuite(){
   let s=initialState();return step(s,"GO","door");
@@ -887,4 +888,210 @@ test("malformed rail import cannot inject a bad sequence, trust, or ending",()=>
   assert.equal(normalized.case6.elsieTrust,3);
   assert.deepEqual(normalized.case6.elsieAsked,["ask","reassure"]);
   assert.equal(normalized.case6.decision,"");
+});
+
+function reachExchange(choice="warn"){
+ let s=boardSolved(reachRails());
+ s=step(s,"TAKE","ticket");
+ s=step(s,"OPEN","case");
+ s=step(s,"TAKE","ledger");
+ s=step(s,"GO","hatch");
+ s=chooseExchange(s,choice);
+ assert.equal(s.status,"chapter6complete");
+ s=continueExchangeCase(s);
+ assert.equal(s.chapter,7);
+ assert.equal(s.room,"exchangeLanding");
+ return s;
+}
+function enterExchange(s){
+ s=step(s,"GO","entrance");
+ assert.equal(s.room,"exchangeHall");
+ return s;
+}
+function interviewMara(s){
+ s=step(s,"TALK","mara");
+ assert.equal(s.case7.dialogue,"mara");
+ s=chooseMara(s,"ticket");
+ assert.equal(s.case7.vaultKey,true);
+ assert.ok(s.inventory.includes("exchange-key"));
+ s=chooseMara(s,"close");
+ return s;
+}
+function collectExchangeRecords(s){
+ s=step(s,"GO","telegraph");
+ assert.equal(s.room,"wireRoom");
+ assert.equal(visibleTargets(s).some(([id])=>id==="carbon"),false);
+ s=step(s,"OPEN","cabinet");
+ s=step(s,"TAKE","carbon");
+ s=step(s,"TAKE","roster");
+ assert.ok(s.inventory.includes("exchange-carbon"));
+ assert.ok(s.inventory.includes("exchange-roster"));
+ s=step(s,"LOOK","machine");
+ assert.ok(s.clues.includes("exchange-blue-door"));
+ s=step(s,"GO","door");
+ return s;
+}
+function inExchangeVault(choice="warn"){
+ let s=interviewMara(enterExchange(reachExchange(choice)));
+ s=collectExchangeRecords(s);
+ s=step(s,"GO","vault");
+ assert.equal(s.room,"exchangeVault");
+ return s;
+}
+function reconcileExchange(s){
+ s=step(s,"TAKE","seal");
+ s=step(s,"OPEN","board");
+ assert.equal(EXCHANGE_BOARD_OPTIONS.length,4);
+ for(const option of ["dock","train","money"])s=chooseReconciliation(s,option);
+ assert.equal(s.case7.boardSolved,true);
+ s=step(s,"TAKE","contract");
+ assert.ok(s.inventory.includes("webb-contract"));
+ return s;
+}
+test("Chapter 6 conclusion continues into the Exchange with case history intact",()=>{
+ let s=reachExchange("warn");
+ assert.equal(s.case7.veraWarned,true);
+ assert.equal(s.case7.maraTrust,1);
+ assert.equal(s.case6.decision,"warn");
+ assert.equal(s.case5.decision,"protect");
+ assert.equal(s.case4.decision,"private");
+ assert.equal(s.case3.boardSolved,true);
+ assert.ok(s.inventory.includes("kingfisher-ledger"));
+ assert.equal(continueExchangeCase(s).room,"exchangeLanding");
+});
+test("Vera warning changes initial Exchange clue and Mara's expectations",()=>{
+ let warned=reachExchange("warn"),silent=reachExchange("silent");
+ assert.equal(warned.case7.veraWarned,true);
+ assert.equal(silent.case7.veraWarned,false);
+ assert.equal(visibleTargets(warned).some(([id])=>id==="note"),true);
+ assert.equal(visibleTargets(silent).some(([id])=>id==="note"),false);
+ warned=step(warned,"LOOK","note");
+ assert.ok(warned.clues.includes("vera-message"));
+ assert.equal(visibleTargets(warned).some(([id])=>id==="note"),false);
+ assert.equal(silent.case7.maraTrust,0);
+});
+test("Mara controls the vault key and hostile interrogation has a recovery path",()=>{
+ let s=enterExchange(reachExchange("silent"));
+ s=step(s,"GO","vault");
+ assert.equal(s.room,"exchangeHall","vault access must be granted");
+ s=step(s,"TALK","mara");
+ assert.equal(MARA_OPTIONS.length,6);
+ s=chooseMara(s,"accuse");
+ assert.equal(s.case7.maraTrust,-2);
+ s=chooseMara(s,"ticket");
+ assert.equal(s.case7.vaultKey,false);
+ s=chooseMara(s,"recording");
+ assert.equal(s.case7.maraTrust,0);
+ assert.ok(s.clues.includes("mara-hears-voice"));
+ s=chooseMara(s,"ticket");
+ assert.equal(s.case7.vaultKey,true);
+ assert.ok(s.clues.includes("mara-testimony"));
+ const n=s.inventory.length;
+ s=chooseMara(s,"ticket");
+ assert.equal(s.inventory.length,n);
+ s=chooseMara(s,"close");
+ assert.equal(s.case7.dialogue,null);
+ s=step(s,"GO","vault");
+ assert.equal(s.room,"exchangeVault");
+});
+test("Telegraph records are cabinet gated and corroborate existing dock and train evidence",()=>{
+ let s=interviewMara(enterExchange(reachExchange()));
+ assert.equal(visibleTargets(s).some(([id])=>id==="vault"),true);
+ s=collectExchangeRecords(s);
+ assert.ok(s.clues.includes("exchange-freight"));
+ assert.ok(s.clues.includes("exchange-transfer"));
+ assert.ok(s.clues.includes("exchange-blue-door"));
+ assert.ok(s.inventory.includes("freight-manifest"));
+ assert.ok(s.inventory.includes("eleanor-ticket"));
+});
+test("Exchange reconciliation requires all three independent original record pairs",()=>{
+ let s=interviewMara(enterExchange(reachExchange()));
+ s=step(s,"GO","vault");
+ s=step(s,"OPEN","board");
+ s=chooseReconciliation(s,"dock");
+ assert.equal(s.case7.boardLinks.length,0,"carbon required");
+ s=chooseReconciliation(s,"train");
+ assert.equal(s.case7.boardLinks.length,0,"duplicate roster required");
+ s=chooseReconciliation(s,"money");
+ assert.equal(s.case7.boardLinks.length,0,"Exchange seal required");
+ s=step(s,"TAKE","seal");
+ s=step(s,"OPEN","board");
+ s=chooseReconciliation(s,"money");
+ assert.deepEqual(s.case7.boardLinks,["money"]);
+ s=step(s,"GO","exit");
+ s=collectExchangeRecords(s);
+ s=step(s,"GO","vault");
+ s=step(s,"OPEN","board");
+ s=chooseReconciliation(s,"dock");
+ s=chooseReconciliation(s,"train");
+ assert.equal(s.case7.boardSolved,true);
+ assert.ok(visibleTargets(s).some(([id])=>id==="contract"));
+ s=step(s,"TAKE","contract");
+ assert.ok(s.clues.includes("webb-signature"));
+ assert.ok(s.memories.includes("blue-door-flash"));
+ assert.ok(s.case7.courierReady);
+});
+test("Courier finale has two distinct persistent outcomes, while Kingfisher remains anonymous",()=>{
+ let s=reconcileExchange(inExchangeVault());
+ s=step(s,"TALK","courier");
+ assert.equal(s.case7.dialogue,"courier");
+ assert.equal(COURIER_OPTIONS.length,3);
+ const follow=chooseCourier(s,"follow");
+ const secure=chooseCourier(s,"secure");
+ assert.equal(follow.status,"chapter7complete");
+ assert.equal(secure.status,"chapter7complete");
+ assert.equal(follow.case7.choice,"follow");
+ assert.equal(secure.case7.choice,"secure");
+ assert.ok(follow.clues.includes("courier-trail"));
+ assert.ok(secure.clues.includes("contract-secured"));
+ assert.ok(follow.transcript.some(x=>x.text.includes("Kingfisher's identity remains hidden")));
+ assert.equal(step(follow,"GO","exit").status,"chapter7complete");
+});
+test("premature courier choice and duplicate signed contract do not bypass proof",()=>{
+ let s=inExchangeVault();
+ assert.equal(visibleTargets(s).some(([id])=>id==="courier"),false);
+ assert.equal(visibleTargets(s).some(([id])=>id==="contract"),false);
+ s=step(s,"TALK","courier");
+ assert.equal(s.status,"playing");
+ s=reconcileExchange(s);
+ const count=s.inventory.length;
+ s=step(s,"TAKE","contract");
+ assert.equal(s.inventory.length,count);
+});
+test("v7 import preserves all six older case snapshots and Exchange reconciliation",()=>{
+ let s=inExchangeVault("silent");
+ s=step(s,"TAKE","seal");
+ s=step(s,"OPEN","board");
+ s=chooseReconciliation(s,"money");
+ const loaded=validateSave(JSON.parse(JSON.stringify(s)));
+ assert.equal(loaded.version,SAVE_VERSION);
+ assert.equal(loaded.chapter,7);
+ assert.deepEqual(loaded.case7.boardLinks,["money"]);
+ assert.equal(loaded.case6.decision,"silent");
+ assert.equal(loaded.case5.decision,"protect");
+ assert.equal(loaded.case4.decision,"private");
+ assert.ok(loaded.inventory.includes("exchange-seal"));
+ for(const version of [1,2,3,4,5,6]){
+  const legacy={...initialState(),version};
+  delete legacy.case7;
+  const migrated=validateSave(legacy);
+  assert.equal(migrated.version,SAVE_VERSION);
+  assert.equal(migrated.chapter,1);
+ }
+});
+test("malformed Exchange import sanitizes trust, board links, dialogue and choice",()=>{
+ const s=inExchangeVault();
+ s.case7.maraTrust=1000;
+ s.case7.maraAsked=["ticket","unknown","ticket","protect"];
+ s.case7.boardLinks=["money","hack","money","dock"];
+ s.case7.boardSolved=true;
+ s.case7.choice="hacked";
+ s.case7.dialogue="injected";
+ const v=validateSave(s);
+ assert.equal(v.case7.maraTrust,3);
+ assert.deepEqual(v.case7.maraAsked,["ticket","protect"]);
+ assert.deepEqual(v.case7.boardLinks,["money","dock"]);
+ assert.equal(v.case7.boardSolved,false);
+ assert.equal(v.case7.choice,"");
+ assert.equal(v.case7.dialogue,null);
 });
