@@ -3,6 +3,32 @@
 
 A retro-first, VR-bound 1947 Chicago noir mystery starring private investigator **Vincent Morrow**.
 
+## Rung 7: The Old Exchange (v0.7.0)
+
+**Seven playable chapters.** Once you complete Car 09 in The Forgotten Rails, click **CONTINUE TO CHAPTER 7: THE OLD EXCHANGE** under Case Controls. Vincent carries his historical inventory, trust decisions, clues, memories and solved case boards into the abandoned Exchange.
+
+### A conspiracy written in ink
+- Four original, procedural 320×200 noir pixel-art locations: the **service lift**, **brass Exchange concourse**, **telegraph room**, and **records vault**.
+- Meet **Mara Bell**, an Exchange clerk who knows Car 09. Whether Vincent warned Vera in Chapter 6 changes Mara's initial trust and whether a folded warning is waiting at the lift.
+- TALK to Mara about the last train, show Eleanor's ticket, promise to protect workers, accuse her, or play Eleanor's wire recording to rebuild trust after an aggressive interview.
+- Visit the telegraph room. OPEN the carbon-copy cabinet to recover the dock dispatch carbon and duplicate railway roster. Examine the teletype's repeating **BLUE DOOR** message.
+- In the records vault, use the **reconciliation board** to connect three independent pairs of documents: dock manifest + Exchange carbon; Eleanor's ticket + duplicate roster; Kingfisher ledger + original K seal. Premature links cannot pass without both pieces of evidence.
+- Recover the **signed transfer authorization** and a new memory. It establishes that **Marcus Webb signed the transfer**, without exposing the still-secret identity of the Kingfisher.
+- Speak with a waiting courier and choose to **follow him toward the blue-painted passage** or **secure Webb's original document** first. Both choices end Chapter 7 and save different clues for the next chapter.
+
+### Play path
+1. Enter the Exchange concourse and TALK to Mara. Present Eleanor's one-way ticket to obtain the records-vault key. If she is wary, reassure her or play the original wire recording.
+2. Enter the telegraph room, OPEN the cabinet, TAKE both dispatch copies, and LOOK at the telegraph machine.
+3. Return to the concourse. GO to the records vault. TAKE the K seal, OPEN the reconciliation board and connect dock, train, and money records.
+4. TAKE the signed contract. TALK to the courier and choose your next move.
+
+### Compatibility, testing and future XR
+- All gameplay still uses the six retro verbs **LOOK / TAKE / OPEN / USE / GO / TALK**, keyboard **1–6**, scene hotspots, and accessible object/action buttons.
+- The Old Exchange detective rules are isolated in `src/chapter7.js`; original pixel art lives in `src/chapter7-art.js`; the shared engine keeps earlier case histories.
+- Save format **v7** accepts v1–v6 exports and retains the same browser storage key. Local save and manual JSON backup both work without accounts.
+- The offline PWA cache advances to `blackout-old-exchange-v7` and includes all new modules. No new runtime dependency or external art.
+- Browser and hardware playtesting are still recommended. Quest 3 XR, production soundtrack and multiplayer remain future releases, not features of this PR.
+
 ## Rung 6: The Forgotten Rails (v0.6.0)
 
 **Six playable chapters.** Complete Warehouse Shadows and choose **CONTINUE TO CHAPTER 6: THE FORGOTTEN RAILS** in Case Controls. Inventory, memories, witness evidence, trust, prior chapter decisions and the completed detective case boards continue into the tunnels.
@@ -174,7 +200,7 @@ To run locally, serve the repository directory through any static HTTP server (f
 ## Narrative origin and production
 BLACKOUT began in November 2025 as a first-person noir investigation inspired by the *feel* of classic detective adventures. The original BLACKOUT master design bible remains the story's authority. This prologue uses the *Marmont Hotel* naming provisionally; archive material also uses *Marlow*, so final naming is a separate canon decision.
 
-**Roadmap:** retro prologue → Crimson Lounge and witnesses → ransacked agency investigation → Ashworth Manor → Warehouse Shadows → Forgotten Rails → Old Exchange → complete branching noir case → 3D/Quest 3 XR adaptation, preserving a stable versioned clue and decision schema across modes. This version does **not** yet have a VR client or multiplayer.
+**Roadmap:** retro prologue → Crimson Lounge and witnesses → ransacked agency investigation → Ashworth Manor → Warehouse Shadows → Forgotten Rails → Old Exchange → The Blue Door → complete branching noir case → 3D/Quest 3 XR adaptation, preserving a stable versioned clue and decision schema across modes. This version does **not** yet have a VR client or multiplayer.
 
 ### Project structure
 | File | Purpose |
@@ -192,6 +218,8 @@ BLACKOUT began in November 2025 as a first-person noir investigation inspired by
 | `src/chapter5-art.js` | Original night dock, loading bay, dispatch office, and freight hold art |
 | `src/chapter6.js` | Elsie Vale witness and signal-switch puzzle, carriage evidence and ending choice |
 | `src/chapter6-art.js` | Original railway tunnel, cabin, platform and passenger carriage scenes |
+| `src/chapter7.js` | Exchange clerk trust, documentary reconciliation, courier choice |
+| `src/chapter7-art.js` | Service lift, concourse, telegraph room and records vault pixel artwork |
 | `sw.js` | Offline app shell |
 | `test/engine.test.mjs` | Native Node tests |
 | `.github/workflows/test.yml` | CI on PRs and pushes |
