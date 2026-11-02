@@ -629,7 +629,7 @@ test("freight combination 417 is clue-gated; bad digits cannot unlock container"
   assert.equal(s.case5.sealOpen,false,"manifest required");
   s=collectManifest(s);
   s=step(s,"OPEN","container");
-  for(let i=0;i<3;i++)for(let j=0;j<[5,1,7][i];j++)s=adjustFreightSeal(s,i,1);
+  for(let i=0;i<3;i++)for(let j=0;j<[6,1,7][i];j++)s=adjustFreightSeal(s,i,1);
   s=submitFreightSeal(s);
   assert.equal(s.case5.sealOpen,false);
   s=adjustFreightSeal(s,0,-1);
