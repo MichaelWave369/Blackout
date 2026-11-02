@@ -5,7 +5,8 @@ import { DOCK_HOTSPOTS, freshWarehouseCase, dockTargets, warehouseAction, saniti
 import { RAIL_HOTSPOTS, freshRailCase, railTargets, railAction, sanitizeRailCase } from "./chapter6.js";
 import { EXCHANGE_HOTSPOTS, freshExchangeCase, exchangeTargets, exchangeAction, sanitizeExchangeCase } from "./chapter7.js";
 import { BLUE_HOTSPOTS, freshBlueCase, blueTargets, blueAction, sanitizeBlueCase } from "./chapter8.js";
-export const SAVE_VERSION = 8;
+import { SILHOUETTE_HOTSPOTS, freshSilhouetteCase, silhouetteTargets, silhouetteAction, sanitizeSilhouetteCase } from "./chapter9.js";
+export const SAVE_VERSION = 9;
 export const STORAGE_KEY = "blackout-blood-on-the-mirror-v1";
 export const VERBS = ["LOOK", "TAKE", "OPEN", "USE", "GO", "TALK"];
 export const ROOM_NAMES = {
@@ -37,7 +38,11 @@ export const ROOM_NAMES = {
   bluePassage: "BEYOND THE EXCHANGE / BLUE PASSAGE",
   switchOffice: "BLUE PASSAGE / SWITCH OFFICE",
   screeningRoom: "BLUE PASSAGE / SCREENING ROOM",
-  blueChamber: "THE BLUE DOOR / OBSERVATION ROOM B"
+  blueChamber: "THE BLUE DOOR / OBSERVATION ROOM B",
+  networkFoyer: "SILHOUETTE / SERVICE FOYER",
+  mapGallery: "SILHOUETTE / CARTOGRAPHY GALLERY",
+  listenArchive: "SILHOUETTE / INTERCEPTION ARCHIVE",
+  signalJunction: "SILHOUETTE / SIGNAL JUNCTION"
 };
 export const HOTSPOTS = {
   bathroom: [
@@ -73,7 +78,8 @@ export const HOTSPOTS = {
   ...DOCK_HOTSPOTS,
   ...RAIL_HOTSPOTS,
   ...EXCHANGE_HOTSPOTS,
-  ...BLUE_HOTSPOTS
+  ...BLUE_HOTSPOTS,
+  ...SILHOUETTE_HOTSPOTS
 };
 export const INTRO = [
   "CHICAGO. 1947. 2:13 A.M.",
@@ -82,7 +88,7 @@ export const INTRO = [
 ];
 const BASE = {
   version: SAVE_VERSION,
-  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, case3: null, case4: null, case5: null, case6: null, case7: null, case8: null, inventory: [], clues: [], memories: [], discovered: [],
+  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, case3: null, case4: null, case5: null, case6: null, case7: null, case8: null, case9: null, inventory: [], clues: [], memories: [], discovered: [],
   opened: [], flags: { mirror: false, body: false, identity: false, window: false, memory: false, evidenceChoice: "", metTommy: false, lastNight: false, reassured: false, pressured: false, heardKingfisher: false, lighterReady: false },
   pressure: 0, storyMode: false, morality: 0, status: "playing", actions: 0,
   transcript: INTRO.map((text, index) => ({ id: index + 1, text, kind: index === 0 ? "chapter" : "narration" }))
@@ -97,6 +103,7 @@ export function visibleTargets(state) {
   if (state.chapter === 6 && RAIL_HOTSPOTS[state.room]) return railTargets(state);
   if (state.chapter === 7 && EXCHANGE_HOTSPOTS[state.room]) return exchangeTargets(state);
   if (state.chapter === 8 && BLUE_HOTSPOTS[state.room]) return blueTargets(state);
+  if (state.chapter === 9 && SILHOUETTE_HOTSPOTS[state.room]) return silhouetteTargets(state);
   return (HOTSPOTS[state.room] || []).filter(([id]) => {
     if (id === "screwdriver") return state.opened.includes("cabinet") && !hasItem(state, "screwdriver");
     if (id === "wallet") return state.opened.includes("jacket") && !hasItem(state, "wallet");
@@ -509,10 +516,27 @@ export function continueBlueCase(state){
   locationChange(next,"bluePassage","CHAPTER 8: THE BLUE DOOR. The courier waits in a painted passage beneath the Exchange. Behind a steel door lies the record that Vincent's memory has tried to protect.");
   return next;
 }
+export function continueSilhouetteCase(state){
+  const next=JSON.parse(JSON.stringify(state));
+  if(next.chapter!==8||next.status!=="chapter8complete"||next.room!=="blueChamber")return next;
+  next.chapter=9;next.status="playing";next.dialogue=null;
+  next.case9=freshSilhouetteCase(next.case8?.choice);
+  locationChange(next,"networkFoyer","CHAPTER 9: THE SILHOUETTE NETWORK. Behind the Blue Door lies a network of watchers. Nora Finch guards an archive that might lead to the person directing it.");
+  return next;
+}
 export function act(state, verb, target, item = "") {
   const next = JSON.parse(JSON.stringify(state));
   if (next.status !== "playing") return next;
   if (!VERBS.includes(verb)) return next;
+  if(next.chapter===9&&SILHOUETTE_HOTSPOTS[next.room]){
+    if(verb!=="LOOK"||target){
+      if(!visibleTargets(next).some(([id])=>id===target)){
+        append(next,"That isn't here. Keep looking.");
+        return next;
+      }
+    }
+    return silhouetteAction(next,verb,target,item);
+  }
   if(next.chapter===8&&BLUE_HOTSPOTS[next.room]){
     if(verb!=="LOOK"||target){
       if(!visibleTargets(next).some(([id])=>id===target)){
@@ -597,7 +621,11 @@ export function act(state, verb, target, item = "") {
       bluePassage: "A blue-painted passage connects a switching office, a film screening room, and a locked steel door.",
       switchOffice: "The switching office houses room-214 surveillance plates and a call log.",
       screeningRoom: "Three film strips await reconstruction in a hand-cranked projector.",
-      blueChamber: "The original Marmont surveillance negative and Eleanor's letter wait beyond the Blue Door."
+      blueChamber: "The original Marmont surveillance negative and Eleanor's letter wait beyond the Blue Door.",
+      networkFoyer: "An operator named Nora Finch guards the hidden Silhouette interception archive.",
+      mapGallery: "A sprawling map of disconnected signal cells traces Hotel, Exchange, and Riverfront relays.",
+      listenArchive: "Intercept logs and the audio spool marked SABLE lie inside a sealed archive.",
+      signalJunction: "A routing board can trace the network to the North Canal communications tower."
     }[next.room]);
     return next;
   }
@@ -622,19 +650,20 @@ export function setStoryMode(state, enabled) {
   return next;
 }
 export function validateSave(value) {
-  if (!value || ![1, 2, 3, 4, 5, 6, 7, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
-  if (!["playing", "caught", "escaped", "chapter2complete", "chapter3complete", "chapter4complete", "chapter5complete", "chapter6complete", "chapter7complete", "chapter8complete"].includes(value.status)) throw new Error("Invalid case file status.");
+  if (!value || ![1, 2, 3, 4, 5, 6, 7, 8, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
+  if (!["playing", "caught", "escaped", "chapter2complete", "chapter3complete", "chapter4complete", "chapter5complete", "chapter6complete", "chapter7complete", "chapter8complete", "chapter9complete"].includes(value.status)) throw new Error("Invalid case file status.");
   for (const key of ["inventory", "clues", "memories", "discovered", "opened", "transcript"]) if (!Array.isArray(value[key])) throw new Error("Case file missing " + key);
   if (!value.flags || typeof value.flags !== "object" || typeof value.pressure !== "number") throw new Error("Invalid case file.");
   const safe = initialState();
   safe.room = value.room; safe.status = value.status;
-  safe.chapter = [1,2,3,4,5,6,7,8].includes(value.chapter) ? value.chapter : 1;
+  safe.chapter = [1,2,3,4,5,6,7,8,9].includes(value.chapter) ? value.chapter : 1;
   safe.case3 = safe.chapter >= 3 ? sanitizeAgencyCase(value.case3) : null;
   safe.case4 = safe.chapter >= 4 ? sanitizeManorCase(value.case4) : null;
   safe.case5 = safe.chapter >= 5 ? sanitizeWarehouseCase(value.case5) : null;
   safe.case6 = safe.chapter >= 6 ? sanitizeRailCase(value.case6) : null;
   safe.case7 = safe.chapter >= 7 ? sanitizeExchangeCase(value.case7) : null;
-  safe.case8 = safe.chapter === 8 ? sanitizeBlueCase(value.case8) : null;
+  safe.case8 = safe.chapter >= 8 ? sanitizeBlueCase(value.case8) : null;
+  safe.case9 = safe.chapter === 9 ? sanitizeSilhouetteCase(value.case9) : null;
   safe.rapport = Number.isFinite(value.rapport) ? Math.max(-3, Math.min(3, value.rapport)) : 0;
   safe.dialogue = value.dialogue === "tommy" && value.room === "lounge" ? "tommy" : null;
   safe.inventory = value.inventory.filter(x => typeof x === "string").slice(0,50);
