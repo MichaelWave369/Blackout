@@ -2,10 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   initialState, act, chooseEvidence, setStoryMode, validateSave, visibleTargets, SAVE_VERSION,
-  continueCase, continueAgencyCase, continueManorCase, chooseDialogue, TOMMY_OPTIONS
+  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, chooseDialogue, TOMMY_OPTIONS
 } from "../src/engine.js";
 import { adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice, BOARD_OPTIONS } from "../src/chapter3.js";
 import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "../src/chapter4.js";
+import { WATCHMAN_OPTIONS, TUNNEL_OPTIONS, chooseWatchman, adjustFreightSeal, submitFreightSeal, chooseTunnel } from "../src/chapter5.js";
 function step(state,verb,target,item="") { return act(state,verb,target,item); }
 function reachSuite(){
   let s=initialState();return step(s,"GO","door");
@@ -521,4 +522,185 @@ test("manor save sanitizer rejects malformed nameplates and clamps bad trust val
   assert.equal(restored.case4.veraTrust,-3);
   assert.deepEqual(restored.case4.portraitSequence,[]);
   assert.deepEqual(restored.case4.haroldAsked,["accuse","webb"]);
+});
+
+function reachWarehouse(manorDecision="private"){
+  let s=enterManor(reachManor());
+  s=step(s,"TALK","harold");
+  s=chooseHaroldDialogue(s,"reassure");
+  s=chooseHaroldDialogue(s,"close");
+  s=searchEleanorRoom(s);
+  s=revealBlackChip(s);
+  s=step(s,"TALK","vera");
+  s=chooseVeraDecision(s,manorDecision);
+  assert.equal(s.status,"chapter4complete");
+  s=continueWarehouseCase(s);
+  assert.equal(s.room,"dockGate");
+  assert.equal(s.chapter,5);
+  return s;
+}
+function reachBay(manorDecision){
+  let s=reachWarehouse(manorDecision);
+  s=step(s,"TALK","watchman");
+  assert.equal(s.case5.access,true);
+  s=step(s,"GO","gate");
+  assert.equal(s.room,"loadingBay");
+  return s;
+}
+function collectManifest(s){
+  s=step(s,"GO","office");
+  s=step(s,"OPEN","cabinet");
+  s=step(s,"TAKE","manifest");
+  assert.ok(s.inventory.includes("freight-manifest"));
+  s=step(s,"GO","door");
+  return s;
+}
+function openFreight(s){
+  s=collectManifest(s);
+  s=step(s,"OPEN","container");
+  for(let i=0;i<3;i++)for(let j=0;j<[4,1,7][i];j++)s=adjustFreightSeal(s,i,1);
+  s=submitFreightSeal(s);
+  assert.equal(s.case5.sealOpen,true);
+  s=step(s,"GO","container");
+  assert.equal(s.room,"containerHold");
+  return s;
+}
+test("completed manor chapter continues into docks without losing previous case data",()=>{
+  let s=reachWarehouse();
+  assert.equal(s.status,"playing");
+  assert.equal(s.case5.watchmanTrust,1);
+  assert.ok(s.inventory.includes("black-k-chip"));
+  assert.equal(s.case4.decision,"private");
+  assert.equal(s.case3.boardSolved,true);
+  assert.equal(continueWarehouseCase(s).room,"dockGate");
+});
+test("public confrontation at manor makes the dock watchman initially wary",()=>{
+  const s=reachWarehouse("confront");
+  assert.equal(s.case5.watchmanTrust,-1);
+  assert.equal(s.case4.decision,"confront");
+});
+test("gate access requires black K proof, and watchman choices have persistent effects",()=>{
+  let s=reachWarehouse();
+  s.inventory=s.inventory.filter(x=>x!=="black-k-chip");
+  s=step(s,"GO","gate");
+  assert.equal(s.room,"dockGate");
+  s=step(s,"TALK","watchman");
+  assert.equal(s.case5.access,false);
+  s.inventory.push("black-k-chip");
+  s=step(s,"TALK","watchman");
+  assert.equal(s.case5.access,true);
+  assert.equal(WATCHMAN_OPTIONS.length,4);
+  s=chooseWatchman(s,"kingfisher");
+  assert.ok(s.clues.includes("watchman-tip"));
+  s=chooseWatchman(s,"promise");
+  const trust=s.case5.watchmanTrust;
+  s=chooseWatchman(s,"promise");
+  assert.equal(s.case5.watchmanTrust,trust,"dialogue rapport cannot be farmed");
+  s=chooseWatchman(s,"threaten");
+  assert.equal(s.case5.watchmanTrust,trust-2);
+  s=chooseWatchman(s,"close");
+  assert.equal(s.case5.dialogue,null);
+  s=step(s,"GO","gate");
+  assert.equal(s.room,"loadingBay");
+});
+test("office manifest becomes accessible only after opening the locked cabinet",()=>{
+  let s=reachBay();
+  s=step(s,"GO","office");
+  assert.equal(visibleTargets(s).some(([id])=>id==="manifest"),false);
+  s=step(s,"TAKE","manifest");
+  assert.ok(!s.inventory.includes("freight-manifest"));
+  s=step(s,"OPEN","cabinet");
+  assert.equal(visibleTargets(s).some(([id])=>id==="manifest"),true);
+  s=step(s,"TAKE","manifest");
+  assert.ok(s.inventory.includes("freight-manifest"));
+  assert.ok(s.clues.includes("warehouse-shipment"));
+  s=step(s,"TALK","radio");
+  assert.ok(s.clues.includes("protected-barge"));
+});
+test("freight combination 417 is clue-gated; bad digits cannot unlock container",()=>{
+  let s=reachBay();
+  s=step(s,"OPEN","container");
+  assert.equal(s.case5.sealPanel,true);
+  s=adjustFreightSeal(s,0,4);
+  assert.deepEqual(s.case5.sealDigits,[0,0,0],"invalid dial jumps ignored");
+  s=adjustFreightSeal(s,0,-1);
+  assert.equal(s.case5.sealDigits[0],9);
+  s=submitFreightSeal(s);
+  assert.equal(s.case5.sealOpen,false,"manifest required");
+  s=collectManifest(s);
+  s=step(s,"OPEN","container");
+  for(let i=0;i<3;i++)for(let j=0;j<[5,1,7][i];j++)s=adjustFreightSeal(s,i,1);
+  s=submitFreightSeal(s);
+  assert.equal(s.case5.sealOpen,false);
+  s=adjustFreightSeal(s,0,-1);
+  s=submitFreightSeal(s);
+  assert.equal(s.case5.sealOpen,true);
+  assert.ok(s.clues.includes("warehouse-opened"));
+  s=step(s,"GO","container");
+  assert.equal(s.room,"containerHold");
+});
+test("wire recording, passenger roster and burned photograph all persist",()=>{
+  let s=openFreight(reachBay());
+  assert.ok(visibleTargets(s).some(([id])=>id==="recorder"));
+  s=step(s,"TAKE","recorder");
+  s=step(s,"TAKE","roster");
+  s=step(s,"OPEN","crate");
+  s=step(s,"TAKE","photo");
+  assert.ok(s.inventory.includes("wire-recording"));
+  assert.ok(s.inventory.includes("transfer-roster"));
+  assert.ok(s.inventory.includes("burned-photo"));
+  assert.ok(s.memories.includes("warehouse-voice"));
+  assert.ok(s.clues.includes("barge-photo"));
+});
+test("witness choice requires recorder and roster before closing fifth chapter",()=>{
+  let s=openFreight(reachBay());
+  s=step(s,"GO","tunnel");
+  assert.equal(s.case5.tunnelPanel,true);
+  s=chooseTunnel(s,"protect");
+  assert.equal(s.status,"playing");
+  s=step(s,"TAKE","recorder");
+  s=chooseTunnel(s,"expose");
+  assert.equal(s.status,"playing","missing roster prevents early completion");
+  s=step(s,"TAKE","roster");
+  assert.equal(TUNNEL_OPTIONS.length,3);
+  const shield=chooseTunnel(s,"protect"),expose=chooseTunnel(s,"expose");
+  assert.equal(shield.status,"chapter5complete");
+  assert.equal(expose.status,"chapter5complete");
+  assert.equal(shield.case5.decision,"protect");
+  assert.equal(expose.case5.decision,"expose");
+  assert.ok(shield.clues.includes("protected-witness"));
+  assert.ok(expose.clues.includes("public-record"));
+  assert.equal(step(shield,"GO","door").status,"chapter5complete");
+});
+test("v1–v4 case files still migrate, v5 saves retain prior trust and warehouse puzzles",()=>{
+  let s=reachBay();
+  s=collectManifest(s);
+  s=step(s,"OPEN","container");
+  s=adjustFreightSeal(s,0,1);
+  const restored=validateSave(JSON.parse(JSON.stringify(s)));
+  assert.equal(restored.version,SAVE_VERSION);
+  assert.equal(restored.chapter,5);
+  assert.equal(restored.case5.sealDigits[0],1);
+  assert.equal(restored.case4.decision,"private");
+  assert.equal(restored.case3.boardSolved,true);
+  assert.ok(restored.inventory.includes("freight-manifest"));
+  for(const version of [1,2,3,4]){
+    const legacy={...initialState(),version};
+    delete legacy.case5;
+    const migrated=validateSave(legacy);
+    assert.equal(migrated.version,SAVE_VERSION);
+    assert.equal(migrated.chapter,1);
+  }
+});
+test("malformed dock state cannot inject trust, stale dialogue, or invalid combination",()=>{
+  const s=reachBay();
+  s.case5.sealDigits=[99,-4,"7"];
+  s.case5.watchmanTrust=500;
+  s.case5.watchmanAsked=["bad","promise","promise","threaten"];
+  s.case5.decision="hack";
+  const restored=validateSave(s);
+  assert.deepEqual(restored.case5.sealDigits,[0,0,0]);
+  assert.equal(restored.case5.watchmanTrust,3);
+  assert.deepEqual(restored.case5.watchmanAsked,["promise","threaten"]);
+  assert.equal(restored.case5.decision,"");
 });
