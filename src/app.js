@@ -1,5 +1,5 @@
 import {
-  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, chooseDialogue, TOMMY_OPTIONS,
+  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, continueCanalCase, chooseDialogue, TOMMY_OPTIONS,
   ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
 } from "./engine.js";
 import { drawChapter2 } from "./chapter2-art.js";
@@ -10,6 +10,8 @@ import { drawRails } from "./chapter6-art.js";
 import { drawExchange } from "./chapter7-art.js";
 import { drawBlueDoor } from "./chapter8-art.js";
 import { drawSilhouette } from "./chapter9-art.js";
+import { drawNorthCanal } from "./chapter10-art.js";
+import { IRIS_OPTIONS, CANAL_ROUTE_OPTIONS, CANAL_END_OPTIONS, chooseIris, chooseCanalRoute, chooseCanalEnd } from "./chapter10.js";
 import { NORA_OPTIONS, ROUTER_OPTIONS, SOURCE_OPTIONS, chooseNora, chooseRoute, chooseSource } from "./chapter9.js";
 import { COURIER_OPTIONS as BLUE_COURIER_OPTIONS, SPLICE_OPTIONS, FINALE_OPTIONS, chooseBlueCourier, chooseSplice, chooseBlueFinale } from "./chapter8.js";
 import { MARA_OPTIONS, BOARD_OPTIONS as EXCHANGE_BOARD_OPTIONS, COURIER_OPTIONS, chooseMara, chooseReconciliation, chooseCourier } from "./chapter7.js";
@@ -257,6 +259,37 @@ Object.assign(descriptions,{
   "shielded-operators":"Vincent protected low-level civilian sources.",
   "live-north-canal":"Vincent elected to pursue the real-time relay."
 });
+Object.assign(names,{
+  "canal-hut-pass":"Relay hut authorization","canal-calibration":"Original relay calibration",
+  "canal-traffic-log":"SABLE-12 traffic log","barge-tag":"E.A. canal transfer tag",
+  "blue-wool-scrap":"Blue coat fragment","sable-trace":"Uncut SABLE-12 trace",
+  "canal-route-order":"Canal signal route","canal-map":"Relay map",
+  "barge-transfer":"E.A. canal transfer","canal-false-clock":"Unreliable radio clock",
+  "canal-sable-route":"Original SABLE route","lantern-dispatch":"Lantern House dispatch",
+  "lantern-tag":"Lantern House cargo tag","eleanor-coat-link":"Eleanor's coat",
+  "lantern-trace":"Lantern House radio trace","lantern-memory":"Eleanor's lantern memory",
+  "iris-sable":"Iris's testimony","iris-authentication":"SABLE packet authenticated",
+  "canal-route-proved":"Canal signal restored","sable-live-call":"Live SABLE transmission",
+  "iris-diversion":"Iris diversion transmitted","lantern-pursuit":"Lantern House pursuit"
+});
+Object.assign(descriptions,{
+  "canal-route-order":"Maintenance notice: LOCK → BARGE → TOWER; police is a decoy.",
+  "canal-map":"Relay diagram confirms the three-stage North Canal route.",
+  "barge-transfer":"E.A. was transported on an unregistered canal barge.",
+  "canal-false-clock":"The transmitter's clock cannot establish the true timeline.",
+  "canal-sable-route":"SABLE-12 path passes through canal lock, barge and tower.",
+  "lantern-dispatch":"Traffic log names Lantern House as the destination.",
+  "lantern-tag":"Cargo tag associates a living E.A. passenger with Lantern House.",
+  "eleanor-coat-link":"Blue wool resembles Eleanor's coat in the film.",
+  "lantern-trace":"Original signal proves the Lantern House dispatch without naming Kingfisher.",
+  "lantern-memory":"Eleanor drew a lantern by the water and gave Vincent a clue.",
+  "iris-sable":"Iris says SABLE is a radio call sign, not a person's name.",
+  "iris-authentication":"The original Silhouette packet was verified by the canal engineer.",
+  "canal-route-proved":"Original LOCK → BARGE → TOWER signal reconstructed.",
+  "sable-live-call":"The live message confirms Lantern House received the transfer.",
+  "iris-diversion":"Vincent sent a diversion to protect Iris.",
+  "lantern-pursuit":"Vincent followed the Lantern House transport without diversion."
+});
 const zones = {
   bathroom: [
     ["mirror", 107, 29, 102, 103], ["cabinet", 22, 43, 69, 92],
@@ -450,6 +483,32 @@ Object.assign(zones,{
    ["exit",300,39,20,161]
  ]
 });
+Object.assign(zones,{
+ canalWalk:[
+  ["notice",0,37,45,32],["lamp",225,13,18,55],
+  ["water",144,164,176,36],["hut",18,41,125,110],
+  ["barge",145,78,173,77],["tower",202,9,65,105],
+  ["iris",69,95,58,105]
+ ],
+ relayHut:[
+  ["map",150,17,143,66],["window",0,65,19,72],
+  ["radio",150,91,152,51],["cabinet",12,19,119,144],
+  ["calibration",28,64,48,34],["log",75,64,42,35],
+  ["exit",302,28,18,164]
+ ],
+ bargeDeck:[
+  ["manifest",171,67,132,26],["hatch",205,91,59,40],
+  ["bell",147,101,36,24],["crate",58,111,104,63],
+  ["tag",79,125,48,26],["cloth",109,142,38,18],
+  ["shore",0,171,75,29]
+ ],
+ towerControl:[
+  ["clock",264,0,47,36],["antenna",303,53,17,60],
+  ["router",19,11,284,124],["printout",128,135,79,31],
+  ["receiver",10,142,200,54],["window",222,137,75,61],
+  ["exit",298,114,22,86]
+ ]
+});
 const palette = {
   bg: "#0b0e1c", tile: "#282735", gold: "#c6a976", blue: "#66858f",
   shadow: "#101320", gray: "#6a6974", red: "#ad3a44",
@@ -604,7 +663,7 @@ function drawAlley() {
   for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
 }
 function drawRain() {
-  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain","exchangeLanding","exchangeHall","wireRoom","exchangeVault","bluePassage","switchOffice","screeningRoom","blueChamber","networkFoyer","mapGallery","listenArchive","signalJunction"].includes(state.room))return;
+  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain","exchangeLanding","exchangeHall","wireRoom","exchangeVault","bluePassage","switchOffice","screeningRoom","blueChamber","networkFoyer","mapGallery","listenArchive","signalJunction","canalWalk","relayHut","bargeDeck","towerControl"].includes(state.room))return;
   for(let i=0;i<47;i++){
     const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
     line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
@@ -624,6 +683,7 @@ function drawScene(){
   else if(["exchangeLanding","exchangeHall","wireRoom","exchangeVault"].includes(room))drawExchange(ctx,state,frame);
   else if(["bluePassage","switchOffice","screeningRoom","blueChamber"].includes(room))drawBlueDoor(ctx,state,frame);
   else if(["networkFoyer","mapGallery","listenArchive","signalJunction"].includes(room))drawSilhouette(ctx,state,frame);
+  else if(["canalWalk","relayHut","bargeDeck","towerControl"].includes(room))drawNorthCanal(ctx,state,frame);
   else drawChapter2(ctx,state,frame);
   drawRain();
   // cinematic pixel border
@@ -637,9 +697,9 @@ function drawScene(){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
     textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
   }
-  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete","chapter7complete","chapter8complete","chapter9complete"].includes(state.status)){
+  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete","chapter7complete","chapter8complete","chapter9complete","chapter10complete"].includes(state.status)){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
-    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE","chapter7complete":"CHAPTER 7 COMPLETE","chapter8complete":"CHAPTER 8 COMPLETE","chapter9complete":"CHAPTER 9 COMPLETE"}[state.status];
+    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE","chapter7complete":"CHAPTER 7 COMPLETE","chapter8complete":"CHAPTER 8 COMPLETE","chapter9complete":"CHAPTER 9 COMPLETE","chapter10complete":"CHAPTER 10 COMPLETE"}[state.status];
     textAt(label,62,40,"#f2d092",12);
   }
 }
