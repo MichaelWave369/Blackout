@@ -106,7 +106,7 @@ function look(s,target){
   },
   coronerOffice:{
    cabinet:c.coronerOpen?"The intake file is open, containing its original docket and verified identification seal.":"A municipal evidence cabinet marked MARMONT / 214.",
-   docket:"Coroner intake: the dead man in the gray suit is Daniel Mercer, a financial audit consultant, not Kingfisher.",
+   docket:"Coroner intake: the dead man in the gray suit is Daniel Mercer, a financial audit consultant. The file does not establish whether he used any alias.",
    seal:"The identification seal includes a booking fingerprint and Mercer family confirmation. It matches the guest card.",
    clock:"The morgue clock stopped during a power fault. It was never a reliable witness to the shooting time.",
    telegram:"Autopsy message: death by a single gunshot. The intake time is not the time of the shot.",
@@ -288,7 +288,7 @@ export function chooseAlibiLink(state,choice){
  s.actions+=1;
  if(c.links.length===3){
   c.boardSolved=true;c.boardOpen=false;
-  say(s,"The last three lines agree: Mercer died at 2:06, and Vincent was across the street. His hands were bloody because he found the body later. The shooter and Kingfisher are still unidentified.","evidence");
+  say(s,"The last three lines agree: Mercer was shot at 2:06, and Vincent was across the street. His bloody hands remain unexplained, while the shooter and Kingfisher are still unidentified.","evidence");
  }
  return s;
 }
@@ -307,7 +307,7 @@ export function chooseAlibiEnding(state,choice){
   say(s,"You lock the original attestation away. Vincent can now remember the shot without taking the blame for it, but he knows the watchers still control the public story.","choice");
  }
  s.status="chapter12complete";
- say(s,"CHAPTER 12 COMPLETE: Daniel Mercer, not Kingfisher, was the victim. Vincent's alibi is corroborated, but the identity of the gunman and Kingfisher's sponsor remains unproven. NEXT: THE MASKED PATRON.","ending");
+ say(s,"CHAPTER 12 COMPLETE: Daniel Mercer was the victim. Vincent's alibi is corroborated, but the identity of the gunman and the person behind Kingfisher remains unproven. NEXT: THE MASKED PATRON.","ending");
  return s;
 }
 export function sanitizeAlibiCase(input){
