@@ -1,5 +1,5 @@
 import {
-  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, chooseDialogue, TOMMY_OPTIONS,
+  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, chooseDialogue, TOMMY_OPTIONS,
   ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
 } from "./engine.js";
 import { drawChapter2 } from "./chapter2-art.js";
@@ -7,6 +7,8 @@ import { drawAgencyChapter } from "./chapter3-art.js";
 import { drawManor } from "./chapter4-art.js";
 import { drawWarehouse } from "./chapter5-art.js";
 import { drawRails } from "./chapter6-art.js";
+import { drawExchange } from "./chapter7-art.js";
+import { MARA_OPTIONS, BOARD_OPTIONS as EXCHANGE_BOARD_OPTIONS, COURIER_OPTIONS, chooseMara, chooseReconciliation, chooseCourier } from "./chapter7.js";
 import { ELSIE_OPTIONS, SWITCH_OPTIONS, EXIT_OPTIONS, chooseElsie, chooseSignal, chooseExchange } from "./chapter6.js";
 import { WATCHMAN_OPTIONS, TUNNEL_OPTIONS, chooseWatchman, adjustFreightSeal, submitFreightSeal, chooseTunnel } from "./chapter5.js";
 import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "./chapter4.js";
@@ -163,6 +165,36 @@ Object.assign(descriptions,{
  "vera-alert":"Vincent sent Vera a discreet warning before following the Exchange lead.",
  "solo-exchange":"Vincent chose to investigate without telling anyone."
 });
+Object.assign(names,{
+ "exchange-key":"Exchange vault key","exchange-carbon":"Dock dispatch carbon",
+ "exchange-roster":"Car 09 duplicate roster","exchange-seal":"Kingfisher Exchange seal",
+ "webb-contract":"Marcus Webb authorization",
+ "vera-message":"Vera's warning","exchange-blue-door":"Blue Door transmission",
+ "exchange-freight":"Dock dispatch link","exchange-transfer":"Car 09 transfer confirmed",
+ "exchange-k":"Kingfisher financial seal","mara-route":"Mara's train route",
+ "mara-hears-voice":"Mara heard Eleanor","mara-testimony":"Mara saw Eleanor",
+ "exchange-board-dock":"Dock records reconciled","exchange-board-train":"Rail records reconciled",
+ "exchange-board-money":"Money trail reconciled","webb-signature":"Webb's authorization",
+ "blue-door-flash":"The Blue Door memory","courier-trail":"Follow courier",
+ "contract-secured":"Contract secured"
+});
+Object.assign(descriptions,{
+ "vera-message":"Vera arranged help from Mara and warned about unreliable clocks.",
+ "exchange-blue-door":"Exchange telegraph mentions the mysterious blue door.",
+ "exchange-freight":"Exchange carbon corroborates the dock freight manifest.",
+ "exchange-transfer":"Duplicate rail records confirm Eleanor arrived alive.",
+ "exchange-k":"The K seal matches the Kingfisher ledger leaf.",
+ "mara-route":"Mara confirms Car 09 passed through the closed Exchange.",
+ "mara-hears-voice":"Mara recognizes Eleanor's voice on the wire recording.",
+ "mara-testimony":"Mara witnessed Eleanor being escorted from the train.",
+ "exchange-board-dock":"Dock transfer was deliberately mislabeled.",
+ "exchange-board-train":"Eleanor was alive on arrival at the Exchange.",
+ "exchange-board-money":"Kingfisher shell accounts financed the illegal transfer.",
+ "webb-signature":"Marcus Webb signed the transfer; the Kingfisher beneficiary is still unidentified.",
+ "blue-door-flash":"Vincent remembers blue paint and Eleanor's hidden key.",
+ "courier-trail":"Vincent pursued a messenger toward the blue-painted passage.",
+ "contract-secured":"Vincent preserved the original signed contract rather than following the messenger."
+});
 const zones = {
   bathroom: [
     ["mirror", 107, 29, 102, 103], ["cabinet", 22, 43, 69, 92],
@@ -277,6 +309,29 @@ Object.assign(zones,{
   ["case",208,114,75,54],["ledger",224,131,51,28],
   ["window",20,12,236,91],["hatch",283,20,36,172],
   ["exit",0,21,25,176],["badge",141,102,39,33]
+ ]
+});
+Object.assign(zones,{
+ exchangeLanding:[
+  ["lift",9,19,109,133],["directory",123,14,61,52],
+  ["note",116,104,45,32],["entrance",169,33,144,124],
+  ["tiles",15,153,303,47],["light",0,5,18,27]
+ ],
+ exchangeHall:[
+  ["mara",119,77,69,75],["telegraph",3,44,88,114],
+  ["vault",237,46,82,118],["board",110,13,119,76],
+  ["clock",263,7,42,42],["return",1,162,71,38],["counter",90,130,140,70]
+ ],
+ wireRoom:[
+  ["cabinet",8,26,108,140],["carbon",28,72,44,37],
+  ["roster",66,78,37,31],["machine",124,82,151,64],
+  ["switch",143,16,108,74],["door",281,17,39,179],
+  ["window",126,8,132,100]
+ ],
+ exchangeVault:[
+  ["board",30,17,246,108],["seal",61,120,89,34],
+  ["contract",155,124,89,37],["courier",285,73,31,118],
+  ["drawer",51,151,205,47],["exit",274,18,46,182],["lamp",1,103,44,59]
  ]
 });
 const palette = {
@@ -433,7 +488,7 @@ function drawAlley() {
   for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
 }
 function drawRain() {
-  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain"].includes(state.room))return;
+  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain","exchangeLanding","exchangeHall","wireRoom","exchangeVault"].includes(state.room))return;
   for(let i=0;i<47;i++){
     const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
     line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
@@ -450,6 +505,7 @@ function drawScene(){
   else if(["manorGate","manorFoyer","manorStudy","eleanorRoom"].includes(room))drawManor(ctx,state,frame);
   else if(["dockGate","loadingBay","freightOffice","containerHold"].includes(room))drawWarehouse(ctx,state,frame);
   else if(["railTunnel","signalCabin","railPlatform","ghostTrain"].includes(room))drawRails(ctx,state,frame);
+  else if(["exchangeLanding","exchangeHall","wireRoom","exchangeVault"].includes(room))drawExchange(ctx,state,frame);
   else drawChapter2(ctx,state,frame);
   drawRain();
   // cinematic pixel border
@@ -463,9 +519,9 @@ function drawScene(){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
     textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
   }
-  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete"].includes(state.status)){
+  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete","chapter7complete"].includes(state.status)){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
-    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE"}[state.status];
+    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE","chapter7complete":"CHAPTER 7 COMPLETE"}[state.status];
     textAt(label,62,40,"#f2d092",12);
   }
 }
