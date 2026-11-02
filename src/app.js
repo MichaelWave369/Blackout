@@ -1,11 +1,13 @@
 import {
-  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, chooseDialogue, TOMMY_OPTIONS,
+  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, chooseDialogue, TOMMY_OPTIONS,
   ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
 } from "./engine.js";
 import { drawChapter2 } from "./chapter2-art.js";
 import { drawAgencyChapter } from "./chapter3-art.js";
 import { drawManor } from "./chapter4-art.js";
 import { drawWarehouse } from "./chapter5-art.js";
+import { drawRails } from "./chapter6-art.js";
+import { ELSIE_OPTIONS, SWITCH_OPTIONS, EXIT_OPTIONS, chooseElsie, chooseSignal, chooseExchange } from "./chapter6.js";
 import { WATCHMAN_OPTIONS, TUNNEL_OPTIONS, chooseWatchman, adjustFreightSeal, submitFreightSeal, chooseTunnel } from "./chapter5.js";
 import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "./chapter4.js";
 import { BOARD_OPTIONS, adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice } from "./chapter3.js";
@@ -132,6 +134,35 @@ Object.assign(descriptions,{
  "protected-witness":"Vincent kept the originals and shielded worker identities.",
  "public-record":"Vincent left copies for investigators, risking information leaks."
 });
+Object.assign(names,{
+ "rail-timetable":"Rail dispatch timetable",
+ "rail-master-key":"Brass master signal key",
+ "eleanor-ticket":"Eleanor's Exchange ticket",
+ "kingfisher-ledger":"Kingfisher ledger page",
+ "car09-badge":"Car 09 conductor badge",
+ "rail-signal-order":"Rail switch order",
+ "rail-417":"Frozen station clock",
+ "car09-transfer":"Car 09 transfer dispatch",
+ "car09-memory":"Eleanor at the train",
+ "elsie-testimony":"Elsie's testimony",
+ "rail-route-open":"Signals restored",
+ "exchange-ticket":"Exchange one-way ticket",
+ "kingfisher-account":"Kingfisher rail accounts",
+ "vera-alert":"Vera warned",
+ "solo-exchange":"Exchange trail concealed"
+});
+Object.assign(descriptions,{
+ "rail-signal-order":"Emergency route runs C → A → B.",
+ "rail-417":"The station clock stopped at 4:17, matching the dock code.",
+ "car09-transfer":"Eleanor's transfer was scheduled for Car 09 at Track Zero.",
+ "car09-memory":"Vincent remembers shouting Eleanor's name as a carriage closed.",
+ "elsie-testimony":"Elsie saw Eleanor escorted alive onto Car 09.",
+ "rail-route-open":"Signals C–A–B restored power to the abandoned carriage.",
+ "exchange-ticket":"Eleanor carried a one-way ticket to the abandoned Exchange.",
+ "kingfisher-account":"Kingfisher shell accounts led to the old Exchange.",
+ "vera-alert":"Vincent sent Vera a discreet warning before following the Exchange lead.",
+ "solo-exchange":"Vincent chose to investigate without telling anyone."
+});
 const zones = {
   bathroom: [
     ["mirror", 107, 29, 102, 103], ["cabinet", 22, 43, 69, 92],
@@ -223,6 +254,29 @@ Object.assign(zones,{
   ["crate",9,137,106,63],["photo",41,148,41,31],
   ["vent",250,15,65,65],["tunnel",247,68,72,129],
   ["door",0,40,18,96]
+ ]
+});
+Object.assign(zones,{
+ railTunnel:[
+  ["cabin",18,20,112,132],["platform",184,19,132,134],
+  ["chalk",126,55,58,59],["poster",91,152,110,36],
+  ["rubble",0,139,87,61],["water",201,176,119,24]
+ ],
+ signalCabin:[
+  ["timetable",20,30,65,83],["locker",265,24,46,128],
+  ["board",56,117,199,79],["telephone",1,105,44,31],
+  ["lamp",175,106,24,16],["window",99,17,149,92],["exit",0,159,48,40]
+ ],
+ railPlatform:[
+  ["elsie",21,76,52,118],["train",75,71,245,89],
+  ["clock",260,16,47,47],["bench",0,140,77,48],
+  ["poster",5,15,123,35],["tunnel",0,71,20,72],["track",82,160,238,40]
+ ],
+ ghostTrain:[
+  ["seat",5,102,197,71],["ticket",111,129,44,21],
+  ["case",208,114,75,54],["ledger",224,131,51,28],
+  ["window",20,12,236,91],["hatch",283,20,36,172],
+  ["exit",0,21,25,176],["badge",141,102,39,33]
  ]
 });
 const palette = {
@@ -379,7 +433,7 @@ function drawAlley() {
   for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
 }
 function drawRain() {
-  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay"].includes(state.room))return;
+  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain"].includes(state.room))return;
   for(let i=0;i<47;i++){
     const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
     line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
@@ -395,6 +449,7 @@ function drawScene(){
   else if(room==="office"||room==="archive")drawAgencyChapter(ctx,state,frame);
   else if(["manorGate","manorFoyer","manorStudy","eleanorRoom"].includes(room))drawManor(ctx,state,frame);
   else if(["dockGate","loadingBay","freightOffice","containerHold"].includes(room))drawWarehouse(ctx,state,frame);
+  else if(["railTunnel","signalCabin","railPlatform","ghostTrain"].includes(room))drawRails(ctx,state,frame);
   else drawChapter2(ctx,state,frame);
   drawRain();
   // cinematic pixel border
@@ -408,9 +463,9 @@ function drawScene(){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
     textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
   }
-  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete"].includes(state.status)){
+  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete"].includes(state.status)){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
-    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE"}[state.status];
+    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE"}[state.status];
     textAt(label,62,40,"#f2d092",12);
   }
 }
