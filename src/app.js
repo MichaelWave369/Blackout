@@ -605,6 +605,37 @@ function render(){
       state=choosePortrait(state,option.id);commit();
     })));
   }
+  if(watchmanPanel){
+    const heading=document.createElement("strong");heading.textContent="NIGHT WATCHMAN / DOCKSIDE INTERVIEW";choices.appendChild(heading);
+    WATCHMAN_OPTIONS.forEach(option=>{
+      const button=makeButton(option.label,()=>{state=chooseWatchman(state,option.id);commit();});
+      button.disabled=warehouse.watchmanAsked.includes(option.id);choices.appendChild(button);
+    });
+  }
+  if(sealPanel){
+    const heading=document.createElement("strong");heading.textContent="FREIGHT SEAL / QUAY • SHIFT • BAY";
+    choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Find the manifest in the dispatch office. The wheels follow QUAY / SHIFT / BAY.";
+    choices.appendChild(hint);
+    const dials=document.createElement("div");dials.className="safe-dials";
+    ["QUAY","SHIFT","BAY"].forEach((label,i)=>{
+      const col=document.createElement("div");col.className="safe-dial";
+      const cap=document.createElement("span");cap.textContent=label;col.appendChild(cap);
+      col.appendChild(makeButton("▲",()=>{state=adjustFreightSeal(state,i,1);commit();},{"aria-label":"Increase "+label+" digit"}));
+      const out=document.createElement("output");out.textContent=String(warehouse.sealDigits[i]);col.appendChild(out);
+      col.appendChild(makeButton("▼",()=>{state=adjustFreightSeal(state,i,-1);commit();},{"aria-label":"Decrease "+label+" digit"}));
+      dials.appendChild(col);
+    });
+    choices.appendChild(dials);
+    choices.appendChild(makeButton("RELEASE FREIGHT SEAL",()=>{state=submitFreightSeal(state);commit();}));
+  }
+  if(tunnelPanel){
+    const heading=document.createElement("strong");heading.textContent="SERVICE TUNNEL / CHOOSE WHAT TO PROTECT";choices.appendChild(heading);
+    TUNNEL_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseTunnel(state,option.id);commit();
+    })));
+  }
   drawScene();
 }
 canvas.addEventListener("click",e=>{
