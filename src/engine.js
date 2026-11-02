@@ -2,7 +2,8 @@
 import { AGENCY_HOTSPOTS, freshAgencyCase, agencyTargets, agencyAction, sanitizeAgencyCase } from "./chapter3.js";
 import { MANOR_HOTSPOTS, freshManorCase, manorTargets, manorAction, sanitizeManorCase } from "./chapter4.js";
 import { DOCK_HOTSPOTS, freshWarehouseCase, dockTargets, warehouseAction, sanitizeWarehouseCase } from "./chapter5.js";
-export const SAVE_VERSION = 5;
+import { RAIL_HOTSPOTS, freshRailCase, railTargets, railAction, sanitizeRailCase } from "./chapter6.js";
+export const SAVE_VERSION = 6;
 export const STORAGE_KEY = "blackout-blood-on-the-mirror-v1";
 export const VERBS = ["LOOK", "TAKE", "OPEN", "USE", "GO", "TALK"];
 export const ROOM_NAMES = {
@@ -22,7 +23,11 @@ export const ROOM_NAMES = {
   dockGate: "SOUTH BRANCH / DOCK GATES",
   loadingBay: "WAREHOUSE 17 / LOADING BAY",
   freightOffice: "WAREHOUSE 17 / DISPATCH OFFICE",
-  containerHold: "WAREHOUSE 17 / SEALED CONTAINER"
+  containerHold: "WAREHOUSE 17 / SEALED CONTAINER",
+  railTunnel: "FORGOTTEN RAILS / DRAINAGE TUNNEL",
+  signalCabin: "FORGOTTEN RAILS / SIGNAL CABIN",
+  railPlatform: "FORGOTTEN RAILS / PLATFORM ZERO",
+  ghostTrain: "CAR 09 / THE ABANDONED TRAIN"
 };
 export const HOTSPOTS = {
   bathroom: [
@@ -55,7 +60,8 @@ export const HOTSPOTS = {
   agency: [["door", "Locked office door"], ["sign", "Detective agency sign"]],
   ...AGENCY_HOTSPOTS,
   ...MANOR_HOTSPOTS,
-  ...DOCK_HOTSPOTS
+  ...DOCK_HOTSPOTS,
+  ...RAIL_HOTSPOTS
 };
 export const INTRO = [
   "CHICAGO. 1947. 2:13 A.M.",
@@ -64,7 +70,7 @@ export const INTRO = [
 ];
 const BASE = {
   version: SAVE_VERSION,
-  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, case3: null, case4: null, case5: null, inventory: [], clues: [], memories: [], discovered: [],
+  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, case3: null, case4: null, case5: null, case6: null, inventory: [], clues: [], memories: [], discovered: [],
   opened: [], flags: { mirror: false, body: false, identity: false, window: false, memory: false, evidenceChoice: "", metTommy: false, lastNight: false, reassured: false, pressured: false, heardKingfisher: false, lighterReady: false },
   pressure: 0, storyMode: false, morality: 0, status: "playing", actions: 0,
   transcript: INTRO.map((text, index) => ({ id: index + 1, text, kind: index === 0 ? "chapter" : "narration" }))
@@ -76,6 +82,7 @@ export function visibleTargets(state) {
   if (state.chapter === 3 && ["office", "archive"].includes(state.room)) return agencyTargets(state);
   if (state.chapter === 4 && MANOR_HOTSPOTS[state.room]) return manorTargets(state);
   if (state.chapter === 5 && DOCK_HOTSPOTS[state.room]) return dockTargets(state);
+  if (state.chapter === 6 && RAIL_HOTSPOTS[state.room]) return railTargets(state);
   return (HOTSPOTS[state.room] || []).filter(([id]) => {
     if (id === "screwdriver") return state.opened.includes("cabinet") && !hasItem(state, "screwdriver");
     if (id === "wallet") return state.opened.includes("jacket") && !hasItem(state, "wallet");
@@ -464,10 +471,27 @@ export function continueWarehouseCase(state){
   locationChange(next,"dockGate","CHAPTER 5: WAREHOUSE SHADOWS. South Branch docks, shortly before dawn. A black K marks the private freight gate. Somebody knows you're coming.");
   return next;
 }
+export function continueRailCase(state){
+  const next=JSON.parse(JSON.stringify(state));
+  if(next.chapter!==5||next.status!=="chapter5complete"||next.room!=="containerHold")return next;
+  next.chapter=6;next.status="playing";next.dialogue=null;
+  next.case6=freshRailCase(next.case5?.decision);
+  locationChange(next,"railTunnel","CHAPTER 6: THE FORGOTTEN RAILS. Beneath the riverfront, Vincent finds the abandoned rail tunnels. An old signal cabin and Platform Zero may lead to Eleanor.");
+  return next;
+}
 export function act(state, verb, target, item = "") {
   const next = JSON.parse(JSON.stringify(state));
   if (next.status !== "playing") return next;
   if (!VERBS.includes(verb)) return next;
+  if(next.chapter===6&&RAIL_HOTSPOTS[next.room]){
+    if(verb!=="LOOK"||target){
+      if(!visibleTargets(next).some(([id])=>id===target)){
+        append(next,"That isn't here. Keep looking.");
+        return next;
+      }
+    }
+    return railAction(next,verb,target,item);
+  }
   if(next.chapter===5&&DOCK_HOTSPOTS[next.room]){
     if(verb!=="LOOK"||target){
       if(!visibleTargets(next).some(([id])=>id===target)){
@@ -513,7 +537,11 @@ export function act(state, verb, target, item = "") {
       dockGate: "The south docks are flooded with rain. A watchman stands beneath a freight lamp.",
       loadingBay: "An unregistered container sits on freight rails beneath a frozen crane.",
       freightOffice: "A dispatcher's office holds a manifest, harbor radio, and abandoned photographs.",
-      containerHold: "A hidden passenger compartment contains a recorder, transfer roster, and tunnel exit."
+      containerHold: "A hidden passenger compartment contains a recorder, transfer roster, and tunnel exit.",
+      railTunnel: "A drainage tunnel leads to a deserted platform and an abandoned signal cabin.",
+      signalCabin: "A dead switchboard, a timetable, and maintenance controls await a master key.",
+      railPlatform: "Platform Zero. Elsie Vale watches Car 09 and its locked doors.",
+      ghostTrain: "Eleanor left a one-way ticket inside the old Pullman car. A lockbox holds the next clue."
     }[next.room]);
     return next;
   }
@@ -538,16 +566,17 @@ export function setStoryMode(state, enabled) {
   return next;
 }
 export function validateSave(value) {
-  if (!value || ![1, 2, 3, 4, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
-  if (!["playing", "caught", "escaped", "chapter2complete", "chapter3complete", "chapter4complete", "chapter5complete"].includes(value.status)) throw new Error("Invalid case file status.");
+  if (!value || ![1, 2, 3, 4, 5, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
+  if (!["playing", "caught", "escaped", "chapter2complete", "chapter3complete", "chapter4complete", "chapter5complete", "chapter6complete"].includes(value.status)) throw new Error("Invalid case file status.");
   for (const key of ["inventory", "clues", "memories", "discovered", "opened", "transcript"]) if (!Array.isArray(value[key])) throw new Error("Case file missing " + key);
   if (!value.flags || typeof value.flags !== "object" || typeof value.pressure !== "number") throw new Error("Invalid case file.");
   const safe = initialState();
   safe.room = value.room; safe.status = value.status;
-  safe.chapter = [1,2,3,4,5].includes(value.chapter) ? value.chapter : 1;
+  safe.chapter = [1,2,3,4,5,6].includes(value.chapter) ? value.chapter : 1;
   safe.case3 = safe.chapter >= 3 ? sanitizeAgencyCase(value.case3) : null;
   safe.case4 = safe.chapter >= 4 ? sanitizeManorCase(value.case4) : null;
-  safe.case5 = safe.chapter === 5 ? sanitizeWarehouseCase(value.case5) : null;
+  safe.case5 = safe.chapter >= 5 ? sanitizeWarehouseCase(value.case5) : null;
+  safe.case6 = safe.chapter === 6 ? sanitizeRailCase(value.case6) : null;
   safe.rapport = Number.isFinite(value.rapport) ? Math.max(-3, Math.min(3, value.rapport)) : 0;
   safe.dialogue = value.dialogue === "tommy" && value.room === "lounge" ? "tommy" : null;
   safe.inventory = value.inventory.filter(x => typeof x === "string").slice(0,50);

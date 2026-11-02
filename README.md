@@ -3,6 +3,34 @@
 
 A retro-first, VR-bound 1947 Chicago noir mystery starring private investigator **Vincent Morrow**.
 
+## Rung 6: The Forgotten Rails (v0.6.0)
+
+**Six playable chapters.** Complete Warehouse Shadows and choose **CONTINUE TO CHAPTER 6: THE FORGOTTEN RAILS** in Case Controls. Inventory, memories, witness evidence, trust, prior chapter decisions and the completed detective case boards continue into the tunnels.
+
+### Explore beneath Chicago
+- Four original 320×200 procedural pixel-art scenes: **drainage tunnel**, **signal cabin**, **abandoned Platform Zero** and **Pullman Car 09**.
+- Meet **Elsie Vale**, a rail mechanic who saw Eleanor being moved alive. Her starting trust depends on whether Vincent protected dockworkers or exposed records in Chapter 5.
+- TALK to Elsie about the black K train. You may reassure or accuse her. If trust falls too low, play **Eleanor's wire recording** to establish your intentions, preventing a permanent dead end.
+- In the signal cabin, recover the transfer timetable, examine the emergency route map, and unlock the signal board with Elsie's master key.
+- The signal-routing puzzle is **not another numeric safe**: throw levers **A, B, C** in the *order documented in the dispatch timetable*. A mistaken lever sequence resets cleanly; the correct sequence restores access to the passenger car.
+- Explore Car 09 to recover **Eleanor's one-way Exchange ticket**, a **Kingfisher ledger leaf** hidden in the conductor's lockbox, and an optional brass badge. The ticket triggers another memory fragment.
+- At the service lift, decide whether to **warn Vera** or proceed **without alerting anyone**. Both paths record different evidence and lead toward the next chapter, the **Old Exchange**.
+
+### Player controls, saving and architecture
+- Existing **LOOK, TAKE, OPEN, USE, GO, TALK** commands (keys **1–6**) still work with pixel-art hotspots and labeled accessible HTML buttons.
+- The switchboard and Elsie conversation use interactive, keyboard-accessible button panels. The chapter's final choice is evidence-gated so you cannot accidentally leave without Eleanor's ticket and ledger.
+- Chapter rules reside in `src/chapter6.js`; 320×200 environment rendering in `src/chapter6-art.js`. The browser UI and shared story-state engine remain independent in preparation for a future Quest 3/XR adapter.
+- **Versioned save v6** imports v1–v5 case exports, preserves earlier chapter snapshots, and uses the existing browser storage key.
+- Offline service worker cache updated to `blackout-forgotten-rails-v6` with both new modules. No external gameplay libraries or art dependencies.
+- This release adds no audio, XR or multiplayer client. Full browser QA on real hardware is still recommended.
+
+### Chapter 6 play path
+1. At the tunnel, examine the emergency map. GO to the platform; TALK to Elsie. Show evidence if she's wary, then ask about the train to receive her signal key.
+2. GO to the cabin; TAKE the dispatch timetable. OPEN the signal board.
+3. Throw the three signal levers in the timetable's documented order. Return to the platform and GO into Car 09.
+4. TAKE Eleanor's ticket. OPEN the conductor's case, TAKE the ledger, optionally collect the badge.
+5. GO to the service lift hatch. Choose whether to warn Vera or investigate alone.
+
 ## Rung 5: Warehouse Shadows (v0.5.0)
 
 **A fifth playable chapter extends the BLACKOUT noir mystery.** Finish Ashworth Manor, make your decision with Vera, and select **CONTINUE TO CHAPTER 5: WAREHOUSE SHADOWS** in the case controls. Your earlier findings, dialogue, trust and agency case file carry forward.
@@ -146,7 +174,7 @@ To run locally, serve the repository directory through any static HTTP server (f
 ## Narrative origin and production
 BLACKOUT began in November 2025 as a first-person noir investigation inspired by the *feel* of classic detective adventures. The original BLACKOUT master design bible remains the story's authority. This prologue uses the *Marmont Hotel* naming provisionally; archive material also uses *Marlow*, so final naming is a separate canon decision.
 
-**Roadmap:** retro prologue → Crimson Lounge and witnesses → ransacked agency investigation → Ashworth Manor → Warehouse Shadows → old city rail yards → complete branching noir case → 3D/Quest 3 XR adaptation, preserving a stable versioned clue and decision schema across modes. This version does **not** yet have a VR client or multiplayer.
+**Roadmap:** retro prologue → Crimson Lounge and witnesses → ransacked agency investigation → Ashworth Manor → Warehouse Shadows → Forgotten Rails → Old Exchange → complete branching noir case → 3D/Quest 3 XR adaptation, preserving a stable versioned clue and decision schema across modes. This version does **not** yet have a VR client or multiplayer.
 
 ### Project structure
 | File | Purpose |
@@ -162,6 +190,8 @@ BLACKOUT began in November 2025 as a first-person noir investigation inspired by
 | `src/chapter4-art.js` | Original mansion gate, foyer, bedroom and study scenes |
 | `src/chapter5.js` | Dockside witness interaction, freight seal, and evidence-choice state |
 | `src/chapter5-art.js` | Original night dock, loading bay, dispatch office, and freight hold art |
+| `src/chapter6.js` | Elsie Vale witness and signal-switch puzzle, carriage evidence and ending choice |
+| `src/chapter6-art.js` | Original railway tunnel, cabin, platform and passenger carriage scenes |
 | `sw.js` | Offline app shell |
 | `test/engine.test.mjs` | Native Node tests |
 | `.github/workflows/test.yml` | CI on PRs and pushes |
