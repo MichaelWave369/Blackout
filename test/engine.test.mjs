@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   initialState, act, chooseEvidence, setStoryMode, validateSave, visibleTargets, SAVE_VERSION,
-  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, chooseDialogue, TOMMY_OPTIONS
+  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, continueCanalCase, chooseDialogue, TOMMY_OPTIONS
 } from "../src/engine.js";
 import { adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice, BOARD_OPTIONS } from "../src/chapter3.js";
 import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "../src/chapter4.js";
@@ -11,6 +11,7 @@ import { ELSIE_OPTIONS, SWITCH_OPTIONS, EXIT_OPTIONS, chooseElsie, chooseSignal,
 import { MARA_OPTIONS, BOARD_OPTIONS as EXCHANGE_BOARD_OPTIONS, COURIER_OPTIONS, chooseMara, chooseReconciliation, chooseCourier } from "../src/chapter7.js";
 import { COURIER_OPTIONS as BLUE_COURIER_OPTIONS, SPLICE_OPTIONS, FINALE_OPTIONS, chooseBlueCourier, chooseSplice, chooseBlueFinale } from "../src/chapter8.js";
 import { NORA_OPTIONS, ROUTER_OPTIONS, SOURCE_OPTIONS, chooseNora, chooseRoute, chooseSource } from "../src/chapter9.js";
+import { IRIS_OPTIONS, CANAL_ROUTE_OPTIONS, CANAL_END_OPTIONS, chooseIris, chooseCanalRoute, chooseCanalEnd } from "../src/chapter10.js";
 function step(state,verb,target,item="") { return act(state,verb,target,item); }
 function reachSuite(){
   let s=initialState();return step(s,"GO","door");
@@ -1511,4 +1512,230 @@ test("malformed Silhouette imported state clamps trust, drops unknown options an
   assert.deepEqual(loaded.case9.routeSequence,[]);
   assert.equal(loaded.case9.dialogue,null);
   assert.equal(loaded.case9.decision,"");
+});
+
+function reachCanal(mode="shield"){
+ let s=reachSignalBoard(reachSilhouette());
+ for(const id of ["hotel","exchange","river"])s=chooseRoute(s,id);
+ s=step(s,"TAKE","evidence");
+ s=step(s,"TALK","line");
+ s=chooseSource(s,mode);
+ assert.equal(s.status,"chapter9complete");
+ s=continueCanalCase(s);
+ assert.equal(s.chapter,10);
+ assert.equal(s.room,"canalWalk");
+ return s;
+}
+function enterRelayHut(s){
+ s=step(s,"TALK","iris");
+ assert.equal(s.case10.dialogue,"iris");
+ s=chooseIris(s,"proof");
+ assert.equal(s.case10.irisPass,true);
+ s=chooseIris(s,"close");
+ s=step(s,"GO","hut");
+ assert.equal(s.room,"relayHut");
+ return s;
+}
+function collectRelayRecords(s){
+ s=enterRelayHut(s);
+ s=step(s,"OPEN","cabinet");
+ s=step(s,"TAKE","calibration");
+ s=step(s,"TAKE","log");
+ assert.ok(s.inventory.includes("canal-calibration"));
+ assert.ok(s.inventory.includes("canal-traffic-log"));
+ s=step(s,"LOOK","map");
+ s=step(s,"GO","exit");
+ assert.equal(s.room,"canalWalk");
+ return s;
+}
+function collectBargeRecords(s){
+ s=step(s,"GO","barge");
+ assert.equal(s.room,"bargeDeck");
+ s=step(s,"LOOK","manifest");
+ s=step(s,"OPEN","crate");
+ s=step(s,"TAKE","tag");
+ s=step(s,"TAKE","cloth");
+ assert.ok(s.inventory.includes("barge-tag"));
+ assert.ok(s.inventory.includes("blue-wool-scrap"));
+ s=step(s,"GO","shore");
+ assert.equal(s.room,"canalWalk");
+ return s;
+}
+function reachCanalTower(mode="shield"){
+ let s=collectRelayRecords(reachCanal(mode));
+ s=collectBargeRecords(s);
+ s=step(s,"GO","tower");
+ assert.equal(s.room,"towerControl");
+ return s;
+}
+function unlockCanalRouter(mode="shield"){
+ let s=reachCanalTower(mode);
+ s=step(s,"OPEN","router");
+ assert.equal(s.case10.routePanel,true);
+ for(const id of ["lock","barge","tower"])s=chooseCanalRoute(s,id);
+ assert.equal(s.case10.routeSolved,true);
+ return s;
+}
+test("Chapter 10 starts from both Silhouette endings while preserving previous case history",()=>{
+ const shield=reachCanal("shield");
+ const trace=reachCanal("trace");
+ assert.equal(shield.case10.priorChoice,"shield");
+ assert.equal(trace.case10.priorChoice,"trace");
+ assert.equal(shield.case10.irisTrust,1);
+ assert.equal(trace.case10.irisTrust,-1);
+ assert.equal(shield.case9.decision,"shield");
+ assert.equal(trace.case9.decision,"trace");
+ assert.equal(shield.case8.choice,"vera");
+ assert.equal(shield.case7.choice,"follow");
+ assert.equal(shield.case3.boardSolved,true);
+ assert.ok(shield.inventory.includes("silhouette-packet"));
+ assert.equal(continueCanalCase(shield).room,"canalWalk","cannot replay chapter transition");
+});
+test("Iris authenticates Silhouette packet and hostile dialogue cannot softlock hut entry",()=>{
+ let s=reachCanal("trace");
+ s=step(s,"GO","hut");
+ assert.equal(s.room,"canalWalk");
+ s=step(s,"TALK","iris");
+ assert.equal(IRIS_OPTIONS.length,5);
+ s=chooseIris(s,"accuse");
+ assert.equal(s.case10.irisTrust,-3);
+ s=chooseIris(s,"sable");
+ assert.ok(s.clues.includes("iris-sable"));
+ s=chooseIris(s,"protect");
+ assert.equal(s.case10.irisTrust,-1);
+ s=chooseIris(s,"proof");
+ assert.equal(s.case10.irisTrust,0);
+ assert.equal(s.case10.irisPass,true);
+ assert.ok(s.clues.includes("iris-authentication"));
+ const count=s.inventory.length;
+ s=chooseIris(s,"proof");
+ assert.equal(s.inventory.length,count,"authorization cannot be farmed");
+ s=chooseIris(s,"close");
+ s=step(s,"GO","hut");
+ assert.equal(s.room,"relayHut");
+});
+test("North Canal relay originals are gated behind Iris pass and cabinet latch",()=>{
+ let s=enterRelayHut(reachCanal());
+ assert.equal(visibleTargets(s).some(([id])=>id==="calibration"),false);
+ s=step(s,"TAKE","calibration");
+ assert.ok(!s.inventory.includes("canal-calibration"));
+ s=step(s,"OPEN","cabinet");
+ assert.equal(visibleTargets(s).some(([id])=>id==="calibration"),true);
+ s=step(s,"TAKE","calibration");
+ s=step(s,"TAKE","log");
+ s=step(s,"LOOK","map");
+ assert.ok(s.inventory.includes("canal-calibration"));
+ assert.ok(s.inventory.includes("canal-traffic-log"));
+ assert.ok(s.clues.includes("lantern-dispatch"));
+ assert.ok(s.clues.includes("canal-map"));
+});
+test("Canal barge cargo tag and optional blue coat scrap remain independent pickups",()=>{
+ let s=reachCanal();
+ s=step(s,"GO","barge");
+ assert.equal(visibleTargets(s).some(([id])=>id==="tag"),false);
+ s=step(s,"LOOK","manifest");
+ assert.ok(s.clues.includes("barge-transfer"));
+ s=step(s,"OPEN","crate");
+ s=step(s,"TAKE","tag");
+ assert.ok(s.inventory.includes("barge-tag"));
+ assert.ok(s.clues.includes("lantern-tag"));
+ assert.ok(!s.inventory.includes("blue-wool-scrap"));
+ s=step(s,"TAKE","cloth");
+ assert.ok(s.inventory.includes("blue-wool-scrap"));
+ assert.ok(s.clues.includes("eleanor-coat-link"));
+});
+test("Tower access requires documented calibration and barge tag, not guesswork",()=>{
+ let s=reachCanal();
+ s=step(s,"GO","tower");
+ assert.equal(s.room,"canalWalk");
+ s=collectRelayRecords(s);
+ s=step(s,"GO","tower");
+ assert.equal(s.room,"canalWalk","missing transfer tag");
+ s=collectBargeRecords(s);
+ s=step(s,"GO","tower");
+ assert.equal(s.room,"towerControl");
+ s.inventory=s.inventory.filter(id=>id!=="canal-traffic-log");
+ s=step(s,"OPEN","router");
+ assert.equal(s.case10.routePanel,false,"missing traffic log prevents route panel");
+});
+test("Router rejects police decoy and wrong order; LOCK-BARGE-TOWER reveals trace",()=>{
+ let s=reachCanalTower();
+ s=step(s,"OPEN","router");
+ assert.equal(CANAL_ROUTE_OPTIONS.length,5);
+ s=chooseCanalRoute(s,"police");
+ assert.deepEqual(s.case10.routeSequence,[]);
+ s=chooseCanalRoute(s,"lock");
+ assert.deepEqual(s.case10.routeSequence,["lock"]);
+ s=chooseCanalRoute(s,"tower");
+ assert.deepEqual(s.case10.routeSequence,[]);
+ for(const id of ["lock","barge","tower"])s=chooseCanalRoute(s,id);
+ assert.equal(s.case10.routeSolved,true);
+ assert.deepEqual(s.case10.routeSequence,["lock","barge","tower"]);
+ assert.ok(s.clues.includes("canal-route-proved"));
+ assert.ok(visibleTargets(s).some(([id])=>id==="printout"));
+});
+test("SABLE live call and printed original point toward Lantern House but never identify Kingfisher",()=>{
+ let s=unlockCanalRouter();
+ s=step(s,"TALK","receiver");
+ assert.equal(s.case10.callHeard,true);
+ assert.ok(s.clues.includes("sable-live-call"));
+ s=step(s,"TAKE","printout");
+ assert.ok(s.inventory.includes("sable-trace"));
+ assert.ok(s.clues.includes("lantern-trace"));
+ assert.ok(s.memories.includes("lantern-memory"));
+ assert.ok(s.transcript.some(x=>x.text.includes("Lantern House")));
+ assert.ok(s.transcript.every(x=>!x.text.includes("Kingfisher is ")));
+});
+test("Two durable North Canal endings require original trace, tag and intercepted call",()=>{
+ let s=unlockCanalRouter("trace");
+ s=step(s,"TALK","receiver");
+ s=chooseCanalEnd(s,"divert");
+ assert.equal(s.status,"playing","must secure original trace");
+ s=step(s,"TAKE","printout");
+ assert.equal(CANAL_END_OPTIONS.length,3);
+ const divert=chooseCanalEnd(s,"divert"),pursue=chooseCanalEnd(s,"pursue");
+ assert.equal(divert.status,"chapter10complete");
+ assert.equal(pursue.status,"chapter10complete");
+ assert.equal(divert.case10.decision,"divert");
+ assert.equal(pursue.case10.decision,"pursue");
+ assert.ok(divert.clues.includes("iris-diversion"));
+ assert.ok(pursue.clues.includes("lantern-pursuit"));
+ assert.deepEqual(divert.inventory,pursue.inventory);
+ assert.equal(step(divert,"GO","exit").status,"chapter10complete");
+});
+test("Save v10 preserves completed chapter snapshots and partial North Canal routing",()=>{
+ let s=reachCanalTower("trace");
+ s=step(s,"OPEN","router");
+ s=chooseCanalRoute(s,"lock");
+ const loaded=validateSave(JSON.parse(JSON.stringify(s)));
+ assert.equal(loaded.version,SAVE_VERSION);
+ assert.equal(loaded.chapter,10);
+ assert.deepEqual(loaded.case10.routeSequence,["lock"]);
+ assert.equal(loaded.case9.decision,"trace");
+ assert.equal(loaded.case8.choice,"vera");
+ assert.equal(loaded.case7.choice,"follow");
+ assert.equal(loaded.case6.decision,"warn");
+ assert.equal(loaded.case3.boardSolved,true);
+ assert.ok(loaded.inventory.includes("barge-tag"));
+ for(let version=1;version<=9;version++){
+  const legacy={...initialState(),version};
+  delete legacy.case10;
+  const migrated=validateSave(legacy);
+  assert.equal(migrated.version,SAVE_VERSION);
+  assert.equal(migrated.chapter,1);
+ }
+});
+test("Malformed v10 import clamps trust and rejects injected state or invalid route",()=>{
+ let s=reachCanalTower();
+ s.case10.irisTrust=900;
+ s.case10.irisAsked=["accuse","bad","accuse","proof"];
+ s.case10.routeSequence=["police","lock","tower"];
+ s.case10.dialogue="unknown";
+ s.case10.decision="inject";
+ const loaded=validateSave(s);
+ assert.equal(loaded.case10.irisTrust,3);
+ assert.deepEqual(loaded.case10.irisAsked,["accuse","proof"]);
+ assert.deepEqual(loaded.case10.routeSequence,[]);
+ assert.equal(loaded.case10.dialogue,null);
+ assert.equal(loaded.case10.decision,"");
 });
