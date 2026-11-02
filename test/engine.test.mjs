@@ -2,9 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   initialState, act, chooseEvidence, setStoryMode, validateSave, visibleTargets, SAVE_VERSION,
-  continueCase, continueAgencyCase, chooseDialogue, TOMMY_OPTIONS
+  continueCase, continueAgencyCase, continueManorCase, chooseDialogue, TOMMY_OPTIONS
 } from "../src/engine.js";
 import { adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice, BOARD_OPTIONS } from "../src/chapter3.js";
+import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "../src/chapter4.js";
 function step(state,verb,target,item="") { return act(state,verb,target,item); }
 function reachSuite(){
   let s=initialState();return step(s,"GO","door");
@@ -295,14 +296,14 @@ test("chapter 2 JSON save resumes Chapter 3 and v3 case state round-trips",()=>{
   s=step(s,"LOOK","safe");
   s=adjustAgencyDial(s,0,1);
   const loaded=validateSave(JSON.parse(JSON.stringify(s)));
-  assert.equal(loaded.version,3);
+  assert.equal(loaded.version,SAVE_VERSION);
   assert.equal(loaded.chapter,3);
   assert.equal(loaded.case3.safeDigits[0],1);
   assert.ok(loaded.inventory.includes("gala-photo"));
   const v2={...s,version:2,room:"agency",chapter:2,status:"chapter2complete"};
   delete v2.case3;
   const migrated=validateSave(v2);
-  assert.equal(migrated.version,3);
+  assert.equal(migrated.version,SAVE_VERSION);
   assert.equal(continueAgencyCase(migrated).chapter,3);
 });
 test("corrupt agency data normalizes dial values and unknown evidence links",()=>{
@@ -313,4 +314,211 @@ test("corrupt agency data normalizes dial values and unknown evidence links",()=
   assert.deepEqual(loaded.case3.safeDigits,[0,0,0]);
   assert.deepEqual(loaded.case3.boardLinks,["eleanor","kingfisher"]);
   assert.equal(loaded.case3.boardSolved,false);
+});
+
+function reachManor(){
+  let s=reachAgency();
+  s=step(s,"OPEN","desk");
+  s=step(s,"OPEN","drawer");
+  s=step(s,"TAKE","photograph");
+  s=step(s,"LOOK","safe");
+  for(let i=0;i<3;i++)for(let j=0;j<[3,6,9][i];j++)s=adjustAgencyDial(s,i,1);
+  s=submitAgencySafe(s);
+  s=collectAgencyFile(s);
+  s=step(s,"LOOK","board");
+  s=agencyBoardChoice(s,"eleanor");
+  s=agencyBoardChoice(s,"kingfisher");
+  s=agencyBoardChoice(s,"webb");
+  assert.equal(s.case3.boardSolved,true,"Agency deductions are complete");
+  s=step(s,"TALK","telephone");
+  assert.equal(s.status,"chapter3complete");
+  s=continueManorCase(s);
+  assert.equal(s.room,"manorGate");
+  return s;
+}
+function enterManor(s){
+  s=step(s,"TALK","guard");
+  s=step(s,"GO","frontdoor");
+  assert.equal(s.room,"manorFoyer");
+  return s;
+}
+function searchEleanorRoom(s){
+  s=step(s,"GO","bedroomdoor");
+  s=step(s,"OPEN","vanity");
+  s=step(s,"TAKE","diary");
+  s=step(s,"OPEN","jewelry");
+  s=step(s,"TAKE","letters");
+  assert.ok(s.inventory.includes("manor-diary"));
+  assert.ok(s.inventory.includes("eleanor-letters"));
+  s=step(s,"GO","foyerdoor");
+  return s;
+}
+function revealBlackChip(s){
+  s=step(s,"GO","studydoor");
+  s=step(s,"TAKE","ledger");
+  s=step(s,"LOOK","portrait");
+  s=choosePortrait(s,"harold");
+  s=choosePortrait(s,"webb");
+  s=choosePortrait(s,"eleanor");
+  assert.equal(s.case4.portraitUnlocked,true);
+  s=step(s,"TAKE","chip");
+  assert.ok(s.inventory.includes("black-k-chip"));
+  return s;
+}
+test("v3 agency completion continues into Ashworth Manor with all previous evidence intact",()=>{
+  let s=reachManor();
+  assert.equal(s.chapter,4);
+  assert.equal(s.status,"playing");
+  assert.ok(s.inventory.includes("case-file"));
+  assert.ok(s.inventory.includes("lighter"));
+  assert.ok(s.clues.includes("vera-call"));
+  assert.equal(s.case4.guardAdmitted,false);
+  assert.equal(continueManorCase(s).room,"manorGate","cannot replay transition");
+});
+test("the locked Ashworth gates require talking to the guard before entry",()=>{
+  let s=reachManor();
+  const oldActions=s.actions;
+  s=step(s,"GO","frontdoor");
+  assert.equal(s.room,"manorGate");
+  assert.equal(s.case4.guardAdmitted,false);
+  s=step(s,"TALK","guard");
+  assert.equal(s.case4.guardAdmitted,true);
+  assert.ok(s.clues.includes("manor-expected"));
+  s=step(s,"GO","frontdoor");
+  assert.equal(s.room,"manorFoyer");
+  assert.ok(s.actions>oldActions);
+  assert.ok(visibleTargets(s).some(([id])=>id==="harold"));
+});
+test("Eleanor's bedroom hides a diary and letters behind separate interactive objects",()=>{
+  let s=enterManor(reachManor());
+  s=step(s,"GO","bedroomdoor");
+  assert.equal(s.room,"eleanorRoom");
+  assert.equal(visibleTargets(s).some(([id])=>id==="diary"),false);
+  s=step(s,"OPEN","vanity");
+  assert.ok(visibleTargets(s).some(([id])=>id==="diary"));
+  s=step(s,"TAKE","diary");
+  assert.ok(s.clues.includes("manor-portrait-order"));
+  assert.ok(s.memories.includes("eleanor-warning"));
+  assert.ok(!s.inventory.includes("eleanor-letters"));
+  s=step(s,"OPEN","jewelry");
+  s=step(s,"TAKE","letters");
+  assert.ok(s.clues.includes("flight-plan"));
+  assert.ok(s.inventory.includes("eleanor-letters"));
+});
+test("Harold's interview saves distinct trust and payment consequences without farming",()=>{
+  let s=enterManor(reachManor());
+  s=step(s,"TALK","harold");
+  assert.equal(s.case4.dialogue,"harold");
+  assert.equal(HAROLD_OPTIONS.length,6);
+  s=chooseHaroldDialogue(s,"eleanor");
+  s=chooseHaroldDialogue(s,"webb");
+  s=chooseHaroldDialogue(s,"payments");
+  assert.ok(s.clues.includes("harold-payments"));
+  s=chooseHaroldDialogue(s,"reassure");
+  assert.equal(s.case4.haroldTrust,1);
+  s=chooseHaroldDialogue(s,"reassure");
+  assert.equal(s.case4.haroldTrust,1);
+  s=chooseHaroldDialogue(s,"accuse");
+  assert.equal(s.case4.haroldTrust,-1);
+  s=chooseHaroldDialogue(s,"close");
+  assert.equal(s.case4.dialogue,null);
+  assert.equal(s.case4.haroldAsked.length,5);
+});
+test("the family portrait sequence unlocks a concealed black K chip and rejects guesses",()=>{
+  let s=enterManor(reachManor());
+  s=searchEleanorRoom(s);
+  s=step(s,"GO","studydoor");
+  s=step(s,"LOOK","portrait");
+  assert.equal(PORTRAIT_OPTIONS.length,4);
+  assert.equal(visibleTargets(s).some(([id])=>id==="chip"),false);
+  s=choosePortrait(s,"webb");
+  assert.deepEqual(s.case4.portraitSequence,[]);
+  s=choosePortrait(s,"harold");
+  s=choosePortrait(s,"webb");
+  assert.deepEqual(s.case4.portraitSequence,["harold","webb"]);
+  s=choosePortrait(s,"eleanor");
+  assert.equal(s.case4.portraitUnlocked,true);
+  assert.ok(visibleTargets(s).some(([id])=>id==="chip"));
+  s=step(s,"TAKE","chip");
+  assert.ok(s.inventory.includes("black-k-chip"));
+  assert.ok(s.clues.includes("black-k-symbol"));
+  const old=s.inventory.length;
+  s=step(s,"TAKE","chip");
+  assert.equal(s.inventory.length,old);
+});
+test("Vera appears after evidence and Harold's interview, not before",()=>{
+  let s=enterManor(reachManor());
+  s=searchEleanorRoom(s);
+  s=revealBlackChip(s);
+  assert.equal(s.case4.veraAppeared,false);
+  s=step(s,"GO","foyerdoor");
+  s=step(s,"TALK","harold");
+  s=chooseHaroldDialogue(s,"eleanor");
+  assert.equal(s.case4.veraAppeared,true);
+  s=step(s,"GO","studydoor");
+  assert.ok(visibleTargets(s).some(([id])=>id==="vera"));
+  s=step(s,"TALK","vera");
+  assert.equal(s.case4.dialogue,"vera");
+  assert.equal(VERA_OPTIONS.length,3);
+  s=chooseVeraDecision(s,"close");
+  assert.equal(s.status,"playing");
+  assert.equal(s.case4.dialogue,null);
+});
+test("open confrontation and private questioning produce different canonical trust flags",()=>{
+  let s=enterManor(reachManor());
+  s=step(s,"TALK","harold");
+  s=chooseHaroldDialogue(s,"reassure");
+  s=chooseHaroldDialogue(s,"close");
+  s=searchEleanorRoom(s);
+  s=revealBlackChip(s);
+  assert.equal(s.case4.veraAppeared,true);
+  s=step(s,"TALK","vera");
+  let publicChoice=chooseVeraDecision(s,"confront");
+  let privateChoice=chooseVeraDecision(s,"private");
+  assert.equal(publicChoice.status,"chapter4complete");
+  assert.equal(privateChoice.status,"chapter4complete");
+  assert.equal(publicChoice.case4.decision,"confront");
+  assert.equal(privateChoice.case4.decision,"private");
+  assert.equal(publicChoice.case4.veraTrust,-1);
+  assert.equal(privateChoice.case4.veraTrust,1);
+  assert.ok(publicChoice.clues.includes("public-confrontation"));
+  assert.ok(privateChoice.clues.includes("private-confrontation"));
+  assert.deepEqual(publicChoice.inventory,s.inventory);
+  assert.equal(step(publicChoice,"GO","foyerdoor").status,"chapter4complete");
+});
+test("all v1-v3 exports remain importable, and v4 Manor state round-trips",()=>{
+  let s=enterManor(reachManor());
+  s=step(s,"TALK","harold");
+  s=chooseHaroldDialogue(s,"accuse");
+  s=chooseHaroldDialogue(s,"close");
+  s=searchEleanorRoom(s);
+  s=step(s,"GO","studydoor");
+  s=step(s,"LOOK","portrait");
+  s=choosePortrait(s,"harold");
+  const restored=validateSave(JSON.parse(JSON.stringify(s)));
+  assert.equal(restored.version,SAVE_VERSION);
+  assert.equal(restored.chapter,4);
+  assert.deepEqual(restored.case4.portraitSequence,["harold"]);
+  assert.ok(restored.inventory.includes("manor-diary"));
+  assert.equal(restored.case4.haroldTrust,-2);
+  assert.equal(restored.case3.boardSolved,true,"Chapter 3 evidence-board state survives Chapter 4 import");
+  for(const version of [1,2,3]){
+    const legacy={...initialState(),version};
+    delete legacy.case4;delete legacy.case3;
+    const imported=validateSave(legacy);
+    assert.equal(imported.version,SAVE_VERSION);
+    assert.equal(imported.chapter,1);
+  }
+});
+test("manor save sanitizer rejects malformed nameplates and clamps bad trust values",()=>{
+  const s=enterManor(reachManor());
+  s.case4.haroldTrust=999;
+  s.case4.veraTrust=-999;
+  s.case4.portraitSequence=["webb","harold","eleanor"];
+  s.case4.haroldAsked=["accuse","bad","accuse","webb"];
+  const restored=validateSave(s);
+  assert.equal(restored.case4.haroldTrust,3);
+  assert.equal(restored.case4.veraTrust,-3);
+  assert.deepEqual(restored.case4.portraitSequence,[]);
+  assert.deepEqual(restored.case4.haroldAsked,["accuse","webb"]);
 });

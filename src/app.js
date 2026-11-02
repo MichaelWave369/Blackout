@@ -1,9 +1,11 @@
 import {
-  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, chooseDialogue, TOMMY_OPTIONS,
+  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, chooseDialogue, TOMMY_OPTIONS,
   ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
 } from "./engine.js";
 import { drawChapter2 } from "./chapter2-art.js";
 import { drawAgencyChapter } from "./chapter3-art.js";
+import { drawManor } from "./chapter4-art.js";
+import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "./chapter4.js";
 import { BOARD_OPTIONS, adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice } from "./chapter3.js";
 
 const $ = id => document.getElementById(id);
@@ -67,6 +69,40 @@ const descriptions = {
   "police-bulletin": "Police seek Vincent for the Marmont shooting",
   "vera-call": "Vera requests a midnight meeting at Ashworth Manor"
 };
+Object.assign(names,{
+  "manor-diary":"Eleanor's secret diary",
+  "eleanor-letters":"Hidden love letters",
+  "manor-ledger":"Ashworth ledger",
+  "black-k-chip":"Black K poker chip",
+  "manor-expected":"Invitation confirmed",
+  "harold-evasion":"Harold's evasions",
+  "harold-webb":"Arranged engagement",
+  "harold-payments":"Webb's finances",
+  "manor-portrait-order":"Portrait lock order",
+  "eleanor-warning":"Eleanor's warning",
+  "flight-plan":"Eleanor's escape plan",
+  "webb-manor-ledger":"Signed Ashworth ledger",
+  "manor-portrait-unlocked":"Portrait compartment",
+  "black-k-symbol":"The black K",
+  "manor-payment-link":"Matching remittances",
+  "public-confrontation":"Harold confronted openly",
+  "private-confrontation":"Harold confronted privately"
+});
+Object.assign(descriptions,{
+  "manor-expected":"Vera told the gatekeeper to expect Vincent.",
+  "harold-evasion":"Harold refuses to explain what really happened to Eleanor.",
+  "harold-webb":"Harold arranged Eleanor's engagement to Marcus Webb.",
+  "harold-payments":"Harold admits Webb handled private business accounts.",
+  "manor-portrait-order":"Father / Suitor / Daughter: a mechanism hidden in the portrait.",
+  "eleanor-warning":"Eleanor told Vincent she would not surrender her future.",
+  "flight-plan":"Eleanor planned to leave the manor voluntarily.",
+  "webb-manor-ledger":"Webb approved mysterious Ashworth Industries transfers.",
+  "manor-portrait-unlocked":"An Ashworth portrait concealed a secret compartment.",
+  "black-k-symbol":"The black K chip points to the Kingfisher's criminal network.",
+  "manor-payment-link":"Payments in Vincent's office match the ledger in Harold's study.",
+  "public-confrontation":"Vincent confronted Harold with Vera still present.",
+  "private-confrontation":"Vincent allowed Vera to leave before questioning Harold."
+});
 const zones = {
   bathroom: [
     ["mirror", 107, 29, 102, 103], ["cabinet", 22, 43, 69, 92],
@@ -111,6 +147,29 @@ const zones = {
     ["cabinet",25,20,106,140],["calendar",169,26,83,73],
     ["diary",184,118,40,23],["receipt",230,119,40,22],
     ["lamp",251,45,52,87],["exit",296,16,24,184]
+  ],
+  manorGate: [
+    ["plaque",91,16,81,40],["lantern",10,19,43,68],
+    ["guard",17,85,44,115],["intercom",65,127,29,48],
+    ["driveway",100,159,155,41],["frontdoor",231,95,73,65]
+  ],
+  manorFoyer: [
+    ["chandelier",116,24,83,42],["painting",236,18,78,75],
+    ["guestbook",19,129,67,31],["stairs",81,79,65,49],
+    ["frontdoor",90,151,54,49],["bedroomdoor",4,46,78,146],
+    ["studydoor",241,96,79,104],["harold",151,78,59,122]
+  ],
+  manorStudy: [
+    ["shelves",3,17,91,107],["window",248,15,64,84],
+    ["desk",16,125,109,75],["ledger",28,120,78,29],
+    ["portrait",118,19,124,99],["chip",166,83,29,23],
+    ["vera",250,88,50,106],["foyerdoor",302,18,18,182]
+  ],
+  eleanorRoom: [
+    ["photo",17,16,58,59],["window",127,14,90,84],
+    ["bed",26,123,131,77],["jewelry",60,109,65,44],
+    ["letters",76,120,45,28],["vanity",198,98,85,89],
+    ["diary",216,127,46,26],["foyerdoor",294,24,26,176]
   ]
 };
 const palette = {
@@ -267,7 +326,7 @@ function drawAlley() {
   for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
 }
 function drawRain() {
-  if(["bathroom","suite","lounge","office","archive"].includes(state.room))return;
+  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate"].includes(state.room))return;
   for(let i=0;i<47;i++){
     const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
     line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
@@ -281,6 +340,7 @@ function drawScene(){
   else if(room==="escape")drawEscape();
   else if(room==="alley")drawAlley();
   else if(room==="office"||room==="archive")drawAgencyChapter(ctx,state,frame);
+  else if(["manorGate","manorFoyer","manorStudy","eleanorRoom"].includes(room))drawManor(ctx,state,frame);
   else drawChapter2(ctx,state,frame);
   drawRain();
   // cinematic pixel border
@@ -294,9 +354,10 @@ function drawScene(){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
     textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
   }
-  if(state.status==="chapter2complete"||state.status==="chapter3complete"){
+  if(["chapter2complete","chapter3complete","chapter4complete"].includes(state.status)){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
-    textAt(state.status==="chapter3complete"?"CHAPTER 3 COMPLETE":"CHAPTER 2 COMPLETE",62,40,"#f2d092",12);
+    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE"}[state.status];
+    textAt(label,62,40,"#f2d092",12);
   }
 }
 function makeButton(text, onClick, attrs={}){
@@ -321,33 +382,47 @@ function render(){
     bathroom:"CHICAGO / 2:13 AM",suite:"ROOM 214 / 2:19 AM",
     escape:"FIRE ESCAPE / 2:23 AM",alley:"CHICAGO / 2:27 AM",
     street:"CHICAGO / 2:34 AM",lounge:"THE CRIMSON LOUNGE / 2:41 AM",agency:"WEST LAKE ST / 3:02 AM",
-    office:"MORROW AGENCY / 3:09 AM",archive:"RECORDS ROOM / 3:16 AM"
+    office:"MORROW AGENCY / 3:09 AM",archive:"RECORDS ROOM / 3:16 AM",
+    manorGate:"ASHWORTH ESTATE / 11:53 PM",manorFoyer:"ASHWORTH FOYER / 12:02 AM",
+    eleanorRoom:"ELEANOR'S ROOM / 12:11 AM",manorStudy:"ASHWORTH STUDY / 12:15 AM"
   }[state.room];
   $("objective").textContent=state.status==="caught"?"CASE STATUS: ARRESTED":
     state.status==="escaped"?"CHAPTER COMPLETE: CONTINUE BELOW":
     state.status==="chapter2complete"?"CHAPTER COMPLETE: THE AGENCY AWAITS":
     state.status==="chapter3complete"?"CHAPTER COMPLETE: ASHWORTH MANOR AT MIDNIGHT":
+    state.status==="chapter4complete"?"CHAPTER COMPLETE: SHADOWS IN THE WAREHOUSE":
     ({bathroom:"OBJECTIVE: RECOVER YOUR IDENTITY",suite:"OBJECTIVE: FIND CLUES AND ESCAPE",
     escape:"OBJECTIVE: DESCEND TO THE ALLEY",alley:"OBJECTIVE: REACH THE CRIMSON LOUNGE",
     street:state.inventory.includes("lighter")?"OBJECTIVE: FIND THE DETECTIVE AGENCY":"OBJECTIVE: ENTER THE CRIMSON LOUNGE",
     lounge:"OBJECTIVE: QUESTION TOMMY TWO-FINGERS",agency:"CASE STATUS: NEXT CHAPTER",
     office:state.case3?.boardSolved?"OBJECTIVE: ANSWER THE TELEPHONE":"OBJECTIVE: SOLVE THE EVIDENCE BOARD",
-    archive:"OBJECTIVE: SEARCH THE ASHWORTH RECORDS"}[state.room]);
+    archive:"OBJECTIVE: SEARCH THE ASHWORTH RECORDS",
+    manorGate:"OBJECTIVE: ENTER ASHWORTH MANOR",
+    manorFoyer:"OBJECTIVE: QUESTION HAROLD, EXPLORE THE MANOR",
+    eleanorRoom:"OBJECTIVE: UNCOVER ELEANOR'S SECRETS",
+    manorStudy:state.case4?.veraAppeared?"OBJECTIVE: SPEAK TO VERA":"OBJECTIVE: UNCOVER THE BLACK K"}[state.room]);
   $("policeStatus").textContent=state.status==="caught"?"POLICE: HERE":
-    state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
+    state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
     state.pressure>=25?"POLICE: AT THE DOOR":state.pressure>=17?"POLICE: APPROACHING":
     state.pressure>=9?"POLICE: SIRENS":"POLICE: DISTANT";
   $("storyMode").checked=state.storyMode;
   $("continueBtn").hidden=!(state.status==="escaped"&&state.room==="alley"&&state.chapter===1);
   $("continueAgencyBtn").hidden=!(state.status==="chapter2complete"&&state.room==="agency"&&state.chapter===2);
+  $("continueManorBtn").hidden=!(state.status==="chapter3complete"&&state.room==="office"&&state.chapter===3);
+  $("relationsPanel").hidden=state.chapter!==4;
+  if(state.chapter===4&&state.case4){
+    const trust=n=>n>0?"TRUSTING":n<0?"STRAINED":"UNCERTAIN";
+    $("relations").textContent="HAROLD: "+trust(state.case4.haroldTrust)+" · VERA: "+trust(state.case4.veraTrust);
+  }
   const verbs=$("verbs");verbs.replaceChildren();
   VERBS.forEach((v,i)=>verbs.appendChild(makeButton((i+1)+". "+v,()=>{verb=v;if(v!=="USE")item="";render();},{"aria-pressed":String(verb===v)})));
   $("commandTip").textContent=state.status==="escaped"?"Chapter 1 complete. Use CONTINUE TO CHAPTER 2 below.":
     state.status==="chapter2complete"?"Chapter 2 complete. Continue to the agency from the CASE CONTROLS.":
-    state.status==="chapter3complete"?"Chapter 3 complete. Ashworth Manor will follow in the next update.":
+    state.status==="chapter3complete"?"Chapter 3 complete. Continue to ASHWORTH MANOR below.":
+    state.status==="chapter4complete"?"Chapter 4 complete. The Warehouse District awaits in a future update.":
     state.status!=="playing"?"Case closed. NEW CASE begins again.":
     verb==="USE"?(item?"USE "+(names[item]||item)+" ON WHAT?":"Choose an inventory item, then choose the target."):
-    verb==="TALK"?"Select someone to question. Tommy has a lot to explain.":
+    verb==="TALK"?"Select a person in the scene to question them.":
     verb+" selected. Choose an object below or click the picture.";
   const objects=$("sceneObjects");objects.replaceChildren();
   visibleTargets(state).forEach(([id,label])=>{
@@ -382,7 +457,12 @@ function render(){
   const safePanel=agencyPlaying&&c?.safeExamined&&!c.safeOpen;
   const boardPanel=agencyPlaying&&c?.boardExamined&&!c.boardSolved;
   const safeFilePanel=agencyPlaying&&c?.safeOpen&&!c.fileTaken;
-  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel);
+  const manor=state.case4;
+  const manorPlaying=state.chapter===4&&state.status==="playing";
+  const haroldPanel=manorPlaying&&state.room==="manorFoyer"&&manor?.dialogue==="harold";
+  const veraPanel=manorPlaying&&state.room==="manorStudy"&&manor?.dialogue==="vera";
+  const portraitPanel=manorPlaying&&state.room==="manorStudy"&&manor?.portraitPanel&&!manor?.portraitUnlocked;
+  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel);
   if(crimeChoice){
     const strong=document.createElement("strong");strong.textContent="A CHOICE: WHAT DO YOU DO WITH THE CRIME SCENE?";choices.appendChild(strong);
     choices.appendChild(makeButton("PRESERVE EVIDENCE",()=>{state=chooseEvidence(state,"preserve");commit();}));
@@ -423,6 +503,36 @@ function render(){
       choices.appendChild(btn);
     });
   }
+  if(haroldPanel){
+    const heading=document.createElement("strong");
+    heading.textContent="HAROLD ASHWORTH / PRIVATE INTERVIEW";choices.appendChild(heading);
+    HAROLD_OPTIONS.forEach(option=>{
+      const button=makeButton(option.label,()=>{state=chooseHaroldDialogue(state,option.id);commit();});
+      button.disabled=manor.haroldAsked.includes(option.id);
+      choices.appendChild(button);
+    });
+  }
+  if(veraPanel){
+    const heading=document.createElement("strong");
+    heading.textContent="VERA / THE FIRST TRUST DECISION";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Harold is listening. Choose whether to confront him openly or let Vera leave first.";
+    choices.appendChild(hint);
+    VERA_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseVeraDecision(state,option.id);commit();
+    })));
+  }
+  if(portraitPanel){
+    const heading=document.createElement("strong");heading.textContent="HIDDEN PORTRAIT / MECHANICAL NAMEPLATES";
+    choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Selected: "+(manor.portraitSequence.length?manor.portraitSequence.join(" → ").toUpperCase():"NONE")+
+      ". Eleanor's diary contains the intended order.";
+    choices.appendChild(hint);
+    PORTRAIT_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=choosePortrait(state,option.id);commit();
+    })));
+  }
   drawScene();
 }
 canvas.addEventListener("click",e=>{
@@ -449,6 +559,7 @@ document.addEventListener("keydown",e=>{
 $("storyMode").addEventListener("change",e=>{state=setStoryMode(state,e.target.checked);commit();});
 $("continueBtn").addEventListener("click",()=>{state=continueCase(state);verb="LOOK";item="";commit();});
 $("continueAgencyBtn").addEventListener("click",()=>{state=continueAgencyCase(state);verb="LOOK";item="";commit();});
+$("continueManorBtn").addEventListener("click",()=>{state=continueManorCase(state);verb="LOOK";item="";commit();});
 $("restartBtn").addEventListener("click",()=>{
   if(!window.confirm("Start a new case? The current auto-save will be replaced. Export first if you want to keep it."))return;
   state=initialState();verb="LOOK";item="";$("fileMessage").textContent="Fresh case opened.";commit();
@@ -456,7 +567,7 @@ $("restartBtn").addEventListener("click",()=>{
 $("exportBtn").addEventListener("click",()=>{
   const content=JSON.stringify(state,null,2);
   const url=URL.createObjectURL(new Blob([content],{type:"application/json"}));
-  const a=document.createElement("a");a.href=url;a.download="blackout-case-v3.json";
+  const a=document.createElement("a");a.href=url;a.download="blackout-case-v4.json";
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
   $("fileMessage").textContent="Case file exported. You can restore it later.";
 });

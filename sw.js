@@ -1,6 +1,6 @@
 /* BLACKOUT offline app shell, no network services required by gameplay. */
-const CACHE="blackout-agency-v3";
-const APP_SHELL=["./","./index.html","./styles.css","./src/app.js","./src/engine.js","./src/chapter2-art.js","./src/chapter3.js","./src/chapter3-art.js"];
+const CACHE="blackout-ashworth-manor-v4";
+const APP_SHELL=["./","./index.html","./styles.css","./src/app.js","./src/engine.js","./src/chapter2-art.js","./src/chapter3.js","./src/chapter3-art.js","./src/chapter4.js","./src/chapter4-art.js"];
 self.addEventListener("install",event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting()));
 });

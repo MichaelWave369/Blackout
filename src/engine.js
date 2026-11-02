@@ -1,6 +1,7 @@
 /* BLACKOUT: original retro detective prototype. MIT code license. */
 import { AGENCY_HOTSPOTS, freshAgencyCase, agencyTargets, agencyAction, sanitizeAgencyCase } from "./chapter3.js";
-export const SAVE_VERSION = 3;
+import { MANOR_HOTSPOTS, freshManorCase, manorTargets, manorAction, sanitizeManorCase } from "./chapter4.js";
+export const SAVE_VERSION = 4;
 export const STORAGE_KEY = "blackout-blood-on-the-mirror-v1";
 export const VERBS = ["LOOK", "TAKE", "OPEN", "USE", "GO", "TALK"];
 export const ROOM_NAMES = {
@@ -12,7 +13,11 @@ export const ROOM_NAMES = {
   lounge: "THE CRIMSON LOUNGE / MAIN FLOOR",
   agency: "VINCENT MORROW / DETECTIVE AGENCY",
   office: "MORROW AGENCY / THE OFFICE",
-  archive: "MORROW AGENCY / RECORDS ROOM"
+  archive: "MORROW AGENCY / RECORDS ROOM",
+  manorGate: "ASHWORTH MANOR / ESTATE GATE",
+  manorFoyer: "ASHWORTH MANOR / GRAND FOYER",
+  manorStudy: "ASHWORTH MANOR / HAROLD'S STUDY",
+  eleanorRoom: "ASHWORTH MANOR / ELEANOR'S ROOM"
 };
 export const HOTSPOTS = {
   bathroom: [
@@ -43,7 +48,8 @@ export const HOTSPOTS = {
     ["telephone", "Club telephone"], ["exit", "Street exit"]
   ],
   agency: [["door", "Locked office door"], ["sign", "Detective agency sign"]],
-  ...AGENCY_HOTSPOTS
+  ...AGENCY_HOTSPOTS,
+  ...MANOR_HOTSPOTS
 };
 export const INTRO = [
   "CHICAGO. 1947. 2:13 A.M.",
@@ -52,7 +58,7 @@ export const INTRO = [
 ];
 const BASE = {
   version: SAVE_VERSION,
-  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, case3: null, inventory: [], clues: [], memories: [], discovered: [],
+  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, case3: null, case4: null, inventory: [], clues: [], memories: [], discovered: [],
   opened: [], flags: { mirror: false, body: false, identity: false, window: false, memory: false, evidenceChoice: "", metTommy: false, lastNight: false, reassured: false, pressured: false, heardKingfisher: false, lighterReady: false },
   pressure: 0, storyMode: false, morality: 0, status: "playing", actions: 0,
   transcript: INTRO.map((text, index) => ({ id: index + 1, text, kind: index === 0 ? "chapter" : "narration" }))
@@ -62,6 +68,7 @@ export function hasItem(state, item) { return state.inventory.includes(item); }
 export function hasClue(state, clue) { return state.clues.includes(clue); }
 export function visibleTargets(state) {
   if (state.chapter === 3 && ["office", "archive"].includes(state.room)) return agencyTargets(state);
+  if (state.chapter === 4 && MANOR_HOTSPOTS[state.room]) return manorTargets(state);
   return (HOTSPOTS[state.room] || []).filter(([id]) => {
     if (id === "screwdriver") return state.opened.includes("cabinet") && !hasItem(state, "screwdriver");
     if (id === "wallet") return state.opened.includes("jacket") && !hasItem(state, "wallet");
@@ -432,10 +439,29 @@ export function continueAgencyCase(state) {
   locationChange(next,"office","CHAPTER 3: THE AGENCY. Files spill across the floor. Someone ransacked your office while you were gone. The clock has stopped, the case board is crooked, and the safe is still locked.");
   return next;
 }
+export function continueManorCase(state) {
+  const next=JSON.parse(JSON.stringify(state));
+  if(next.chapter!==3||next.status!=="chapter3complete"||next.room!=="office")return next;
+  next.chapter=4;
+  next.status="playing";
+  next.dialogue=null;
+  next.case4=freshManorCase();
+  locationChange(next,"manorGate","CHAPTER 4: ASHWORTH MANOR. Midnight. The iron gates glitter with rain. Beyond them waits Harold Ashworth and a house full of secrets.");
+  return next;
+}
 export function act(state, verb, target, item = "") {
   const next = JSON.parse(JSON.stringify(state));
   if (next.status !== "playing") return next;
   if (!VERBS.includes(verb)) return next;
+  if(next.chapter===4&&MANOR_HOTSPOTS[next.room]){
+    if(verb!=="LOOK"||target){
+      if(!visibleTargets(next).some(([id])=>id===target)){
+        append(next,"That isn't here. Keep looking.");
+        return next;
+      }
+    }
+    return manorAction(next,verb,target,item);
+  }
   if(next.chapter===3&&["office","archive"].includes(next.room)){
     if(verb!=="LOOK"||target){
       if(!visibleTargets(next).some(([id])=>id===target)) {
@@ -455,7 +481,11 @@ export function act(state, verb, target, item = "") {
       lounge: "Amber light, whispered threats, the bartender Tommy, and a jazz pianist playing to a room of strangers.",
       agency: "The sign above the door reads VINCENT MORROW. The next chapter waits inside.",
       office: "Your ransacked agency contains a case board, a wall safe, a stopped clock, and a battered desk.",
-      archive: "Dusty records and a June calendar surround an overstuffed filing cabinet."
+      archive: "Dusty records and a June calendar surround an overstuffed filing cabinet.",
+      manorGate: "The Ashworth gates shine beneath the rain. A gatekeeper waits with an iron key.",
+      manorFoyer: "Harold Ashworth stands beneath a chandelier. Two closed doors lead to the secrets of the house.",
+      manorStudy: "A business ledger, a portrait with brass nameplates, and dark shadows fill Harold's study.",
+      eleanorRoom: "Eleanor's room has been searched. The vanity and jewelry box haven't given up their secrets."
     }[next.room]);
     return next;
   }
@@ -480,14 +510,15 @@ export function setStoryMode(state, enabled) {
   return next;
 }
 export function validateSave(value) {
-  if (!value || ![1, 2, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
-  if (!["playing", "caught", "escaped", "chapter2complete", "chapter3complete"].includes(value.status)) throw new Error("Invalid case file status.");
+  if (!value || ![1, 2, 3, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
+  if (!["playing", "caught", "escaped", "chapter2complete", "chapter3complete", "chapter4complete"].includes(value.status)) throw new Error("Invalid case file status.");
   for (const key of ["inventory", "clues", "memories", "discovered", "opened", "transcript"]) if (!Array.isArray(value[key])) throw new Error("Case file missing " + key);
   if (!value.flags || typeof value.flags !== "object" || typeof value.pressure !== "number") throw new Error("Invalid case file.");
   const safe = initialState();
   safe.room = value.room; safe.status = value.status;
-  safe.chapter = [1,2,3].includes(value.chapter) ? value.chapter : 1;
-  safe.case3 = safe.chapter === 3 ? sanitizeAgencyCase(value.case3) : null;
+  safe.chapter = [1,2,3,4].includes(value.chapter) ? value.chapter : 1;
+  safe.case3 = safe.chapter >= 3 ? sanitizeAgencyCase(value.case3) : null;
+  safe.case4 = safe.chapter === 4 ? sanitizeManorCase(value.case4) : null;
   safe.rapport = Number.isFinite(value.rapport) ? Math.max(-3, Math.min(3, value.rapport)) : 0;
   safe.dialogue = value.dialogue === "tommy" && value.room === "lounge" ? "tommy" : null;
   safe.inventory = value.inventory.filter(x => typeof x === "string").slice(0,50);

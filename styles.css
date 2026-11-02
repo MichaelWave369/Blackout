@@ -34,3 +34,11 @@ footer{text-align:center;letter-spacing:.12em;font-size:10px;color:#777989;margi
 .safe-dial button:hover{background:#65434b}
 .choice-panel button:disabled{opacity:.55;cursor:default}
 @media(max-width:530px){.safe-dials{gap:4px}.safe-dial{padding:8px 2px}.safe-dial span{font-size:8px}}
+
+/* BLACKOUT Chapter 4: period-paper interrogation and mechanical portrait controls. */
+#relations{color:#e0c6a0;border-color:#b28d68;line-height:1.7;font-size:11px}
+.choice-panel button:focus-visible{outline:3px solid #f5d69a;outline-offset:3px}
+.choice-panel button{line-height:1.4}
+.choice-panel:has(.agency-hint){border-color:#99746c}
+.chapter-continue{box-shadow:inset 0 0 0 1px #ffffff13}
+.chapter-continue:focus-visible{outline:3px solid #f5d69a;outline-offset:3px}

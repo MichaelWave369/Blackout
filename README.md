@@ -3,6 +3,36 @@
 
 A retro-first, VR-bound 1947 Chicago noir mystery starring private investigator **Vincent Morrow**.
 
+## Rung 4: Ashworth Manor (v0.4.0)
+
+**Vincent Morrow's fourth chapter is playable.** Finish the Agency investigation and answer Vera's call, then choose **CONTINUE TO CHAPTER 4: ASHWORTH MANOR** in Case Controls. All prior clues, memories, trust, moral choices and inventory carry forward.
+
+### Investigate the mansion
+- Explore four original procedural pixel-art scenes: the rain-soaked **estate gates**, **grand foyer**, **Eleanor's bedroom**, and **Harold's study**.
+- TALK to the gatekeeper before the iron gates will open. The Estate already knows Vincent's name.
+- Interview **Harold Ashworth**, Eleanor's father. His evasions, answers about Marcus Webb, and suspicious payments add evidence. Promises and accusations change his separate trust state.
+- Search Eleanor's vanity and jewelry box to collect a **torn diary page**, **hidden love letters**, and another memory fragment.
+- Inspect the mechanical **family portrait**, then select its three rotating brass nameplates in the diary's implied order to reveal the **black K poker chip**.
+- Search Harold's study ledger, optionally match the old payment receipt, and confront **Vera** when enough evidence has been recovered.
+- Make the first major **trust decision**: challenge Harold openly with Vera present, or allow Vera to leave before speaking privately. Both outcomes persist for future chapters.
+- The story ends with the **Warehouse District** lead, setting up Chapter 5.
+
+### How to play Chapter 4
+1. At the gate, TALK to the gatekeeper, then GO through the manor entrance.
+2. In the foyer, TALK to Harold. Investigate his answers and the family portrait.
+3. GO to Eleanor's bedroom. OPEN the vanity and jewelry box; TAKE the diary and love letters.
+4. GO to Harold's study. TAKE the ledger; LOOK at the family portrait. Select the nameplates in the order implied by Eleanor's diary.
+5. TAKE the black K chip. If Vera does not appear yet, return to the foyer and speak with Harold, then visit the study again.
+6. TALK to Vera and make your final decision. Review the notebook's recorded consequence.
+
+### Technical design and continuity
+- The original engine is still source-of-truth for chapter, inventory, memories, clues and choices.
+- `src/chapter4.js` owns new deterministic puzzle/dialogue rules. `src/chapter4-art.js` draws new original Canvas scenes. The browser interface remains separate for later XR adaptation.
+- Save schema **v4** imports **v1/v2/v3** files and retains the earlier Chapter 3 evidence-board snapshot, while keeping the browser storage key unchanged.
+- Fully offline-capable on previously loaded supported secure browsers; the app shell has a versioned service worker cache.
+- All critical portrait and dialogue interactions have readable HTML button alternatives to clicking pixel art.
+- No new third-party runtime or art dependency; **no VR mode yet**.
+
 ## Rung 3: The Agency (v0.3.0)
 
 **The ransacked office is playable.** Complete Chapter 2, then choose **CONTINUE TO CHAPTER 3: THE AGENCY** under Case Controls to carry Vincent's notebook, memories, evidence and choices into the next investigation.
@@ -88,7 +118,7 @@ To run locally, serve the repository directory through any static HTTP server (f
 ## Narrative origin and production
 BLACKOUT began in November 2025 as a first-person noir investigation inspired by the *feel* of classic detective adventures. The original BLACKOUT master design bible remains the story's authority. This prologue uses the *Marmont Hotel* naming provisionally; archive material also uses *Marlow*, so final naming is a separate canon decision.
 
-**Roadmap:** retro prologue → Crimson Lounge and witnesses → ransacked agency investigation → Ashworth Manor → complete branching noir case → 3D/Quest 3 XR adaptation, preserving a stable versioned clue and decision schema across modes. This version does **not** yet have a VR client or multiplayer.
+**Roadmap:** retro prologue → Crimson Lounge and witnesses → ransacked agency investigation → Ashworth Manor → Warehouse District → complete branching noir case → 3D/Quest 3 XR adaptation, preserving a stable versioned clue and decision schema across modes. This version does **not** yet have a VR client or multiplayer.
 
 ### Project structure
 | File | Purpose |
@@ -100,6 +130,8 @@ BLACKOUT began in November 2025 as a first-person noir investigation inspired by
 | `src/chapter2-art.js` | Procedural neon street, lounge and agency-exterior scenes |
 | `src/chapter3.js` | Agency and records-room puzzles, safe and evidence deductions |
 | `src/chapter3-art.js` | Original ransacked office and records-room pixel art |
+| `src/chapter4.js` | Ashworth Manor, Harold and Vera dialogue, portrait puzzle, branching consequences |
+| `src/chapter4-art.js` | Original mansion gate, foyer, bedroom and study scenes |
 | `sw.js` | Offline app shell |
 | `test/engine.test.mjs` | Native Node tests |
 | `.github/workflows/test.yml` | CI on PRs and pushes |
