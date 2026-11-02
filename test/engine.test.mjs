@@ -2,11 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   initialState, act, chooseEvidence, setStoryMode, validateSave, visibleTargets, SAVE_VERSION,
-  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, chooseDialogue, TOMMY_OPTIONS
+  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, chooseDialogue, TOMMY_OPTIONS
 } from "../src/engine.js";
 import { adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice, BOARD_OPTIONS } from "../src/chapter3.js";
 import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "../src/chapter4.js";
 import { WATCHMAN_OPTIONS, TUNNEL_OPTIONS, chooseWatchman, adjustFreightSeal, submitFreightSeal, chooseTunnel } from "../src/chapter5.js";
+import { ELSIE_OPTIONS, SWITCH_OPTIONS, EXIT_OPTIONS, chooseElsie, chooseSignal, chooseExchange } from "../src/chapter6.js";
 function step(state,verb,target,item="") { return act(state,verb,target,item); }
 function reachSuite(){
   let s=initialState();return step(s,"GO","door");
@@ -703,4 +704,187 @@ test("malformed dock state cannot inject trust, stale dialogue, or invalid combi
   assert.equal(restored.case5.watchmanTrust,3);
   assert.deepEqual(restored.case5.watchmanAsked,["promise","threaten"]);
   assert.equal(restored.case5.decision,"");
+});
+
+function reachRails(choice="protect"){
+  let s=openFreight(reachBay());
+  s=step(s,"TAKE","recorder");
+  s=step(s,"TAKE","roster");
+  s=step(s,"GO","tunnel");
+  s=chooseTunnel(s,choice);
+  assert.equal(s.status,"chapter5complete");
+  s=continueRailCase(s);
+  assert.equal(s.chapter,6);
+  assert.equal(s.room,"railTunnel");
+  return s;
+}
+function meetElsie(s){
+  s=step(s,"GO","platform");
+  assert.equal(s.room,"railPlatform");
+  s=step(s,"TALK","elsie");
+  assert.equal(s.case6.dialogue,"elsie");
+  return s;
+}
+function readySignal(s){
+  s=meetElsie(s);
+  if(s.case6.elsieTrust<0)s=chooseElsie(s,"show-proof");
+  s=chooseElsie(s,"ask");
+  assert.ok(s.inventory.includes("rail-master-key"));
+  s=step(s,"GO","tunnel");
+  s=step(s,"GO","cabin");
+  s=step(s,"TAKE","timetable");
+  s=step(s,"OPEN","board");
+  assert.equal(s.case6.switchPanel,true);
+  return s;
+}
+function boardSolved(s){
+  s=readySignal(s);
+  for(const k of ["C","A","B"])s=chooseSignal(s,k);
+  assert.equal(s.case6.signalsAligned,true);
+  s=step(s,"GO","exit");
+  s=step(s,"GO","platform");
+  s=step(s,"GO","train");
+  assert.equal(s.room,"ghostTrain");
+  return s;
+}
+test("fifth chapter's final witness choice influences Elsie's initial trust",()=>{
+  const protect=reachRails("protect");
+  const expose=reachRails("expose");
+  assert.equal(protect.case6.elsieTrust,1);
+  assert.equal(expose.case6.elsieTrust,-1);
+  assert.equal(protect.case5.decision,"protect");
+  assert.equal(expose.case5.decision,"expose");
+  assert.equal(protect.case4.decision,"private");
+  assert.equal(protect.case3.boardSolved,true);
+  assert.equal(continueRailCase(protect).room,"railTunnel");
+});
+test("platform, signal cabin, and tunnel are independently navigable",()=>{
+  let s=reachRails();
+  const tunnelTargets=visibleTargets(s).map(([id])=>id);
+  assert.ok(tunnelTargets.includes("cabin")&&tunnelTargets.includes("platform"));
+  s=step(s,"GO","cabin");assert.equal(s.room,"signalCabin");
+  assert.ok(visibleTargets(s).some(([id])=>id==="board"));
+  s=step(s,"GO","exit");assert.equal(s.room,"railTunnel");
+  s=step(s,"GO","platform");assert.equal(s.room,"railPlatform");
+  s=step(s,"GO","train");
+  assert.equal(s.room,"railPlatform","train inaccessible until route restored");
+});
+test("Elsie requires evidence and trust, but a hostile player can recover",()=>{
+  let s=meetElsie(reachRails("expose"));
+  assert.equal(ELSIE_OPTIONS.length,5);
+  s=chooseElsie(s,"ask");
+  assert.equal(s.case6.keyGranted,false);
+  s=chooseElsie(s,"accuse");
+  assert.equal(s.case6.elsieTrust,-3);
+  s=chooseElsie(s,"reassure");
+  assert.equal(s.case6.elsieTrust,-1);
+  s=chooseElsie(s,"show-proof");
+  assert.equal(s.case6.elsieTrust,0);
+  assert.ok(s.clues.includes("elsie-hears-eleanor"));
+  s=chooseElsie(s,"ask");
+  assert.equal(s.case6.keyGranted,true);
+  assert.ok(s.inventory.includes("rail-master-key"));
+  const n=s.inventory.length;
+  s=chooseElsie(s,"ask");
+  assert.equal(s.inventory.length,n,"master key cannot be farmed");
+});
+test("signal board cannot be opened until key and dispatch timetable collected",()=>{
+  let s=reachRails();
+  s=step(s,"GO","cabin");
+  s=step(s,"OPEN","board");
+  assert.equal(s.case6.switchPanel,false);
+  s=step(s,"TAKE","timetable");
+  assert.ok(s.clues.includes("car09-transfer"));
+  s=step(s,"OPEN","board");
+  assert.equal(s.case6.switchPanel,false);
+  s=step(s,"GO","exit");
+  s=meetElsie(s);
+  s=chooseElsie(s,"ask");
+  s=step(s,"GO","tunnel");
+  s=step(s,"GO","cabin");
+  s=step(s,"OPEN","board");
+  assert.equal(s.case6.switchPanel,true);
+});
+test("incorrect switch order resets and correct C-A-B route unlocks Car 09",()=>{
+  let s=readySignal(reachRails());
+  assert.equal(SWITCH_OPTIONS.length,4);
+  s=chooseSignal(s,"A");
+  assert.deepEqual(s.case6.switchSequence,[]);
+  s=chooseSignal(s,"C");
+  assert.deepEqual(s.case6.switchSequence,["C"]);
+  s=chooseSignal(s,"B");
+  assert.deepEqual(s.case6.switchSequence,[]);
+  s=chooseSignal(s,"C");
+  s=chooseSignal(s,"A");
+  s=chooseSignal(s,"B");
+  assert.equal(s.case6.signalsAligned,true);
+  assert.deepEqual(s.case6.switchSequence,["C","A","B"]);
+  assert.ok(s.clues.includes("rail-route-open"));
+  s=step(s,"GO","exit");
+  s=step(s,"GO","platform");
+  s=step(s,"GO","train");
+  assert.equal(s.room,"ghostTrain");
+});
+test("Car 09 has evidence-gated one-way ticket, lockbox and memory",()=>{
+  let s=boardSolved(reachRails());
+  assert.equal(visibleTargets(s).some(([id])=>id==="ledger"),false);
+  s=step(s,"TAKE","ticket");
+  assert.ok(s.inventory.includes("eleanor-ticket"));
+  assert.ok(s.memories.includes("car09-memory"));
+  s=step(s,"OPEN","case");
+  assert.equal(visibleTargets(s).some(([id])=>id==="ledger"),true);
+  s=step(s,"TAKE","ledger");
+  assert.ok(s.inventory.includes("kingfisher-ledger"));
+  assert.ok(s.clues.includes("kingfisher-account"));
+  s=step(s,"TAKE","badge");
+  assert.ok(s.inventory.includes("car09-badge"));
+});
+test("Exchange choice requires both ticket and ledger, with distinct endings",()=>{
+  let s=boardSolved(reachRails());
+  s=step(s,"GO","hatch");assert.equal(s.case6.exitPanel,true);
+  s=chooseExchange(s,"warn");assert.equal(s.status,"playing");
+  s=step(s,"TAKE","ticket");
+  s=chooseExchange(s,"silent");assert.equal(s.status,"playing");
+  s=step(s,"OPEN","case");
+  s=step(s,"TAKE","ledger");
+  assert.equal(EXIT_OPTIONS.length,3);
+  const warn=chooseExchange(s,"warn"),silent=chooseExchange(s,"silent");
+  assert.equal(warn.status,"chapter6complete");
+  assert.equal(silent.status,"chapter6complete");
+  assert.equal(warn.case6.decision,"warn");
+  assert.equal(silent.case6.decision,"silent");
+  assert.ok(warn.clues.includes("vera-alert"));
+  assert.ok(silent.clues.includes("solo-exchange"));
+  assert.equal(step(warn,"GO","hatch").status,"chapter6complete");
+});
+test("v6 saves retain prior evidence, Elsie's interview and partial signal sequence",()=>{
+  let s=readySignal(reachRails("expose"));
+  s=chooseSignal(s,"C");
+  const old=validateSave(JSON.parse(JSON.stringify(s)));
+  assert.equal(old.version,SAVE_VERSION);
+  assert.equal(old.chapter,6);
+  assert.deepEqual(old.case6.switchSequence,["C"]);
+  assert.equal(old.case5.decision,"expose");
+  assert.equal(old.case4.decision,"private");
+  assert.equal(old.case3.boardSolved,true);
+  assert.ok(old.inventory.includes("wire-recording"));
+  for(const version of [1,2,3,4,5]){
+    const oldSave={...initialState(),version};
+    delete oldSave.case6;
+    const imported=validateSave(oldSave);
+    assert.equal(imported.version,SAVE_VERSION);
+    assert.equal(imported.chapter,1);
+  }
+});
+test("malformed rail import cannot inject a bad sequence, trust, or ending",()=>{
+  let s=meetElsie(reachRails());
+  s.case6.switchSequence=["B","C","A"];
+  s.case6.elsieTrust=500;
+  s.case6.elsieAsked=["unknown","ask","ask","reassure"];
+  s.case6.decision="script-injection";
+  const normalized=validateSave(s);
+  assert.deepEqual(normalized.case6.switchSequence,[]);
+  assert.equal(normalized.case6.elsieTrust,3);
+  assert.deepEqual(normalized.case6.elsieAsked,["ask","reassure"]);
+  assert.equal(normalized.case6.decision,"");
 });
