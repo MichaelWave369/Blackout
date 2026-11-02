@@ -1,7 +1,8 @@
 /* BLACKOUT: original retro detective prototype. MIT code license. */
 import { AGENCY_HOTSPOTS, freshAgencyCase, agencyTargets, agencyAction, sanitizeAgencyCase } from "./chapter3.js";
 import { MANOR_HOTSPOTS, freshManorCase, manorTargets, manorAction, sanitizeManorCase } from "./chapter4.js";
-export const SAVE_VERSION = 4;
+import { DOCK_HOTSPOTS, freshWarehouseCase, dockTargets, warehouseAction, sanitizeWarehouseCase } from "./chapter5.js";
+export const SAVE_VERSION = 5;
 export const STORAGE_KEY = "blackout-blood-on-the-mirror-v1";
 export const VERBS = ["LOOK", "TAKE", "OPEN", "USE", "GO", "TALK"];
 export const ROOM_NAMES = {
@@ -17,7 +18,11 @@ export const ROOM_NAMES = {
   manorGate: "ASHWORTH MANOR / ESTATE GATE",
   manorFoyer: "ASHWORTH MANOR / GRAND FOYER",
   manorStudy: "ASHWORTH MANOR / HAROLD'S STUDY",
-  eleanorRoom: "ASHWORTH MANOR / ELEANOR'S ROOM"
+  eleanorRoom: "ASHWORTH MANOR / ELEANOR'S ROOM",
+  dockGate: "SOUTH BRANCH / DOCK GATES",
+  loadingBay: "WAREHOUSE 17 / LOADING BAY",
+  freightOffice: "WAREHOUSE 17 / DISPATCH OFFICE",
+  containerHold: "WAREHOUSE 17 / SEALED CONTAINER"
 };
 export const HOTSPOTS = {
   bathroom: [
@@ -49,7 +54,8 @@ export const HOTSPOTS = {
   ],
   agency: [["door", "Locked office door"], ["sign", "Detective agency sign"]],
   ...AGENCY_HOTSPOTS,
-  ...MANOR_HOTSPOTS
+  ...MANOR_HOTSPOTS,
+  ...DOCK_HOTSPOTS
 };
 export const INTRO = [
   "CHICAGO. 1947. 2:13 A.M.",
@@ -58,7 +64,7 @@ export const INTRO = [
 ];
 const BASE = {
   version: SAVE_VERSION,
-  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, case3: null, case4: null, inventory: [], clues: [], memories: [], discovered: [],
+  room: "bathroom", chapter: 1, rapport: 0, dialogue: null, case3: null, case4: null, case5: null, inventory: [], clues: [], memories: [], discovered: [],
   opened: [], flags: { mirror: false, body: false, identity: false, window: false, memory: false, evidenceChoice: "", metTommy: false, lastNight: false, reassured: false, pressured: false, heardKingfisher: false, lighterReady: false },
   pressure: 0, storyMode: false, morality: 0, status: "playing", actions: 0,
   transcript: INTRO.map((text, index) => ({ id: index + 1, text, kind: index === 0 ? "chapter" : "narration" }))
@@ -69,6 +75,7 @@ export function hasClue(state, clue) { return state.clues.includes(clue); }
 export function visibleTargets(state) {
   if (state.chapter === 3 && ["office", "archive"].includes(state.room)) return agencyTargets(state);
   if (state.chapter === 4 && MANOR_HOTSPOTS[state.room]) return manorTargets(state);
+  if (state.chapter === 5 && DOCK_HOTSPOTS[state.room]) return dockTargets(state);
   return (HOTSPOTS[state.room] || []).filter(([id]) => {
     if (id === "screwdriver") return state.opened.includes("cabinet") && !hasItem(state, "screwdriver");
     if (id === "wallet") return state.opened.includes("jacket") && !hasItem(state, "wallet");
@@ -449,10 +456,27 @@ export function continueManorCase(state) {
   locationChange(next,"manorGate","CHAPTER 4: ASHWORTH MANOR. Midnight. The iron gates glitter with rain. Beyond them waits Harold Ashworth and a house full of secrets.");
   return next;
 }
+export function continueWarehouseCase(state){
+  const next=JSON.parse(JSON.stringify(state));
+  if(next.chapter!==4||next.status!=="chapter4complete"||next.room!=="manorStudy")return next;
+  next.chapter=5;next.status="playing";next.dialogue=null;
+  next.case5=freshWarehouseCase(next.case4?.decision);
+  locationChange(next,"dockGate","CHAPTER 5: WAREHOUSE SHADOWS. South Branch docks, shortly before dawn. A black K marks the private freight gate. Somebody knows you're coming.");
+  return next;
+}
 export function act(state, verb, target, item = "") {
   const next = JSON.parse(JSON.stringify(state));
   if (next.status !== "playing") return next;
   if (!VERBS.includes(verb)) return next;
+  if(next.chapter===5&&DOCK_HOTSPOTS[next.room]){
+    if(verb!=="LOOK"||target){
+      if(!visibleTargets(next).some(([id])=>id===target)){
+        append(next,"That isn't here. Keep looking.");
+        return next;
+      }
+    }
+    return warehouseAction(next,verb,target,item);
+  }
   if(next.chapter===4&&MANOR_HOTSPOTS[next.room]){
     if(verb!=="LOOK"||target){
       if(!visibleTargets(next).some(([id])=>id===target)){
@@ -485,7 +509,11 @@ export function act(state, verb, target, item = "") {
       manorGate: "The Ashworth gates shine beneath the rain. A gatekeeper waits with an iron key.",
       manorFoyer: "Harold Ashworth stands beneath a chandelier. Two closed doors lead to the secrets of the house.",
       manorStudy: "A business ledger, a portrait with brass nameplates, and dark shadows fill Harold's study.",
-      eleanorRoom: "Eleanor's room has been searched. The vanity and jewelry box haven't given up their secrets."
+      eleanorRoom: "Eleanor's room has been searched. The vanity and jewelry box haven't given up their secrets.",
+      dockGate: "The south docks are flooded with rain. A watchman stands beneath a freight lamp.",
+      loadingBay: "An unregistered container sits on freight rails beneath a frozen crane.",
+      freightOffice: "A dispatcher's office holds a manifest, harbor radio, and abandoned photographs.",
+      containerHold: "A hidden passenger compartment contains a recorder, transfer roster, and tunnel exit."
     }[next.room]);
     return next;
   }
@@ -510,15 +538,16 @@ export function setStoryMode(state, enabled) {
   return next;
 }
 export function validateSave(value) {
-  if (!value || ![1, 2, 3, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
-  if (!["playing", "caught", "escaped", "chapter2complete", "chapter3complete", "chapter4complete"].includes(value.status)) throw new Error("Invalid case file status.");
+  if (!value || ![1, 2, 3, 4, SAVE_VERSION].includes(value.version) || !ROOM_NAMES[value.room]) throw new Error("Not a compatible BLACKOUT case file.");
+  if (!["playing", "caught", "escaped", "chapter2complete", "chapter3complete", "chapter4complete", "chapter5complete"].includes(value.status)) throw new Error("Invalid case file status.");
   for (const key of ["inventory", "clues", "memories", "discovered", "opened", "transcript"]) if (!Array.isArray(value[key])) throw new Error("Case file missing " + key);
   if (!value.flags || typeof value.flags !== "object" || typeof value.pressure !== "number") throw new Error("Invalid case file.");
   const safe = initialState();
   safe.room = value.room; safe.status = value.status;
-  safe.chapter = [1,2,3,4].includes(value.chapter) ? value.chapter : 1;
+  safe.chapter = [1,2,3,4,5].includes(value.chapter) ? value.chapter : 1;
   safe.case3 = safe.chapter >= 3 ? sanitizeAgencyCase(value.case3) : null;
-  safe.case4 = safe.chapter === 4 ? sanitizeManorCase(value.case4) : null;
+  safe.case4 = safe.chapter >= 4 ? sanitizeManorCase(value.case4) : null;
+  safe.case5 = safe.chapter === 5 ? sanitizeWarehouseCase(value.case5) : null;
   safe.rapport = Number.isFinite(value.rapport) ? Math.max(-3, Math.min(3, value.rapport)) : 0;
   safe.dialogue = value.dialogue === "tommy" && value.room === "lounge" ? "tommy" : null;
   safe.inventory = value.inventory.filter(x => typeof x === "string").slice(0,50);
