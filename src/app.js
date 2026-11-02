@@ -1,5 +1,5 @@
 import {
-  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, chooseDialogue, TOMMY_OPTIONS,
+  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, chooseDialogue, TOMMY_OPTIONS,
   ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
 } from "./engine.js";
 import { drawChapter2 } from "./chapter2-art.js";
@@ -9,6 +9,8 @@ import { drawWarehouse } from "./chapter5-art.js";
 import { drawRails } from "./chapter6-art.js";
 import { drawExchange } from "./chapter7-art.js";
 import { drawBlueDoor } from "./chapter8-art.js";
+import { drawSilhouette } from "./chapter9-art.js";
+import { NORA_OPTIONS, ROUTER_OPTIONS, SOURCE_OPTIONS, chooseNora, chooseRoute, chooseSource } from "./chapter9.js";
 import { COURIER_OPTIONS as BLUE_COURIER_OPTIONS, SPLICE_OPTIONS, FINALE_OPTIONS, chooseBlueCourier, chooseSplice, chooseBlueFinale } from "./chapter8.js";
 import { MARA_OPTIONS, BOARD_OPTIONS as EXCHANGE_BOARD_OPTIONS, COURIER_OPTIONS, chooseMara, chooseReconciliation, chooseCourier } from "./chapter7.js";
 import { ELSIE_OPTIONS, SWITCH_OPTIONS, EXIT_OPTIONS, chooseElsie, chooseSignal, chooseExchange } from "./chapter6.js";
@@ -224,6 +226,37 @@ Object.assign(descriptions,{
  "vera-original-film":"Vera received the intact original for safekeeping.",
  "solo-original-film":"Vincent concealed his discovery to investigate alone."
 });
+Object.assign(names,{
+  "archive-pass":"Nora's archive pass","cell-registry":"Civilian cell registry",
+  "silhouette-overlay":"Signal route overlay","intercept-log":"Overnight intercept log",
+  "sable-spool":"SABLE audio spool","silhouette-packet":"Routed signal packet",
+  "silhouette-route-map":"Silhouette relay map","silhouette-cell-structure":"Separate network cells",
+  "false-timestamps":"Deliberately altered clocks","north-canal-tower":"Canal communications tower",
+  "cell-operators":"Civilian operators","route-overlay":"Signal overlay",
+  "intercept-chain":"Overnight call chain","sable-call":"SABLE transmission",
+  "north-canal-lead":"North Canal lead","silhouette-memory":"Eleanor's three circles",
+  "nora-cells":"Nora's testimony","nora-authentication":"Authentic hotel film",
+  "silhouette-route-proved":"Proven original signal path","north-canal-message":"Live North Canal message",
+  "shielded-operators":"Operators protected","live-north-canal":"Live signal pursued"
+});
+Object.assign(descriptions,{
+  "silhouette-route-map":"Hotel to Exchange to Riverfront; police dispatch is a decoy.",
+  "silhouette-cell-structure":"Silhouette uses separate cells; Kingfisher remains unidentified.",
+  "false-timestamps":"Network clocks were intentionally unsynchronized.",
+  "north-canal-tower":"A communications tower stands near North Canal.",
+  "cell-operators":"Civilian cell operators were given limited information.",
+  "route-overlay":"Acetate shows the original call network.",
+  "intercept-chain":"Call log confirms the Hotel-Exchange-Riverfront path.",
+  "sable-call":"SABLE is a call sign, not verified as a person's identity.",
+  "north-canal-lead":"Original routed packet points to North Canal.",
+  "silhouette-memory":"Eleanor warns the network's operators cannot identify one another.",
+  "nora-cells":"Nora confirms compartmentalized cells and hidden sponsors.",
+  "nora-authentication":"Nora verifies the uncut hotel recording.",
+  "silhouette-route-proved":"Signal path correctly reconstructed, excluding a police-line decoy.",
+  "north-canal-message":"SABLE's live message directs a vehicle north along the canal.",
+  "shielded-operators":"Vincent protected low-level civilian sources.",
+  "live-north-canal":"Vincent elected to pursue the real-time relay."
+});
 const zones = {
   bathroom: [
     ["mirror", 107, 29, 102, 103], ["cabinet", 22, 43, 69, 92],
@@ -391,6 +424,32 @@ Object.assign(zones,{
   ["door",299,138,21,62]
  ]
 });
+Object.assign(zones,{
+ networkFoyer:[
+   ["emblem",132,13,72,80],["notice",10,18,50,27],
+   ["phone",14,110,85,86],["stairs",0,46,110,110],
+   ["vent",267,11,45,36],["archive",223,46,97,130],
+   ["nora",90,70,61,130]
+ ],
+ mapGallery:[
+   ["index",144,141,161,46],["map",56,14,212,117],
+   ["photo",277,23,42,72],["registry",21,133,113,65],
+   ["sheet",40,150,68,32],["acetate",226,89,40,35],
+   ["foyer",0,18,20,180]
+ ],
+ listenArchive:[
+   ["desk",152,147,114,50],["wire",184,148,40,41],
+   ["cabinet",6,23,124,136],["intercepts",36,71,62,31],
+   ["reel",140,86,126,56],["return",0,162,44,37],
+   ["hatch",267,18,53,181]
+ ],
+ signalJunction:[
+   ["antenna",7,28,28,100],["clock",250,0,63,38],
+   ["mask",221,135,77,65],["panel",22,16,273,116],
+   ["evidence",53,137,118,57],["line",36,139,167,56],
+   ["exit",300,39,20,161]
+ ]
+});
 const palette = {
   bg: "#0b0e1c", tile: "#282735", gold: "#c6a976", blue: "#66858f",
   shadow: "#101320", gray: "#6a6974", red: "#ad3a44",
@@ -545,7 +604,7 @@ function drawAlley() {
   for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
 }
 function drawRain() {
-  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain","exchangeLanding","exchangeHall","wireRoom","exchangeVault","bluePassage","switchOffice","screeningRoom","blueChamber"].includes(state.room))return;
+  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain","exchangeLanding","exchangeHall","wireRoom","exchangeVault","bluePassage","switchOffice","screeningRoom","blueChamber","networkFoyer","mapGallery","listenArchive","signalJunction"].includes(state.room))return;
   for(let i=0;i<47;i++){
     const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
     line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
@@ -564,6 +623,7 @@ function drawScene(){
   else if(["railTunnel","signalCabin","railPlatform","ghostTrain"].includes(room))drawRails(ctx,state,frame);
   else if(["exchangeLanding","exchangeHall","wireRoom","exchangeVault"].includes(room))drawExchange(ctx,state,frame);
   else if(["bluePassage","switchOffice","screeningRoom","blueChamber"].includes(room))drawBlueDoor(ctx,state,frame);
+  else if(["networkFoyer","mapGallery","listenArchive","signalJunction"].includes(room))drawSilhouette(ctx,state,frame);
   else drawChapter2(ctx,state,frame);
   drawRain();
   // cinematic pixel border
@@ -577,9 +637,9 @@ function drawScene(){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
     textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
   }
-  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete","chapter7complete","chapter8complete"].includes(state.status)){
+  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete","chapter7complete","chapter8complete","chapter9complete"].includes(state.status)){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
-    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE","chapter7complete":"CHAPTER 7 COMPLETE","chapter8complete":"CHAPTER 8 COMPLETE"}[state.status];
+    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE","chapter7complete":"CHAPTER 7 COMPLETE","chapter8complete":"CHAPTER 8 COMPLETE","chapter9complete":"CHAPTER 9 COMPLETE"}[state.status];
     textAt(label,62,40,"#f2d092",12);
   }
 }
