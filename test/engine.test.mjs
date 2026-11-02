@@ -2,13 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   initialState, act, chooseEvidence, setStoryMode, validateSave, visibleTargets, SAVE_VERSION,
-  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, chooseDialogue, TOMMY_OPTIONS
+  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, chooseDialogue, TOMMY_OPTIONS
 } from "../src/engine.js";
 import { adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice, BOARD_OPTIONS } from "../src/chapter3.js";
 import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "../src/chapter4.js";
 import { WATCHMAN_OPTIONS, TUNNEL_OPTIONS, chooseWatchman, adjustFreightSeal, submitFreightSeal, chooseTunnel } from "../src/chapter5.js";
 import { ELSIE_OPTIONS, SWITCH_OPTIONS, EXIT_OPTIONS, chooseElsie, chooseSignal, chooseExchange } from "../src/chapter6.js";
 import { MARA_OPTIONS, BOARD_OPTIONS as EXCHANGE_BOARD_OPTIONS, COURIER_OPTIONS, chooseMara, chooseReconciliation, chooseCourier } from "../src/chapter7.js";
+import { COURIER_OPTIONS as BLUE_COURIER_OPTIONS, SPLICE_OPTIONS, FINALE_OPTIONS, chooseBlueCourier, chooseSplice, chooseBlueFinale } from "../src/chapter8.js";
 function step(state,verb,target,item="") { return act(state,verb,target,item); }
 function reachSuite(){
   let s=initialState();return step(s,"GO","door");
@@ -1094,4 +1095,194 @@ test("malformed Exchange import sanitizes trust, board links, dialogue and choic
  assert.equal(v.case7.boardSolved,false);
  assert.equal(v.case7.choice,"");
  assert.equal(v.case7.dialogue,null);
+});
+
+function reachBlue(choice="follow"){
+ let s=reconcileExchange(inExchangeVault());
+ s=step(s,"TALK","courier");
+ s=chooseCourier(s,choice);
+ assert.equal(s.status,"chapter7complete");
+ s=continueBlueCase(s);
+ assert.equal(s.chapter,8);
+ assert.equal(s.room,"bluePassage");
+ return s;
+}
+function reachProjection(s){
+ s=step(s,"GO","switchroom");
+ assert.equal(s.room,"switchOffice");
+ s=step(s,"OPEN","cabinet");
+ s=step(s,"TAKE","plate");
+ s=step(s,"LOOK","log");
+ assert.ok(s.inventory.includes("marmont-plate"));
+ s=step(s,"GO","exit");
+ s=step(s,"GO","screening");
+ assert.equal(s.room,"screeningRoom");
+ for(const id of ["hotel","witness","funds"])s=step(s,"TAKE",id);
+ assert.equal(s.case8.filmTaken.length,3);
+ s=step(s,"OPEN","projector");
+ assert.equal(s.case8.splicePanel,true);
+ return s;
+}
+function openBlueDoor(s){
+ s=reachProjection(s);
+ for(const id of ["hotel","witness","funds"])s=chooseSplice(s,id);
+ assert.equal(s.case8.reelSolved,true);
+ s=step(s,"GO","exit");
+ s=step(s,"GO","blueDoor");
+ assert.equal(s.room,"blueChamber");
+ return s;
+}
+test("The Blue Door continues Chapter 7 without losing all previous investigations",()=>{
+ const follow=reachBlue("follow"),secure=reachBlue("secure");
+ assert.equal(follow.case8.priorChoice,"follow");
+ assert.equal(secure.case8.priorChoice,"secure");
+ assert.equal(follow.case8.courierTrust,1);
+ assert.equal(secure.case8.courierTrust,0);
+ assert.equal(follow.case7.choice,"follow");
+ assert.equal(secure.case7.choice,"secure");
+ assert.equal(follow.case6.decision,"warn");
+ assert.equal(follow.case3.boardSolved,true);
+ assert.ok(follow.inventory.includes("webb-contract"));
+ assert.equal(continueBlueCase(follow).room,"bluePassage");
+});
+test("The courier reacts to earlier decision and gives evidence without revealing Kingfisher",()=>{
+ let s=reachBlue("secure");
+ s=step(s,"TALK","courier");
+ assert.equal(BLUE_COURIER_OPTIONS.length,4);
+ s=chooseBlueCourier(s,"show");
+ assert.ok(s.clues.includes("courier-webb"));
+ s=chooseBlueCourier(s,"ask");
+ assert.ok(s.clues.includes("courier-cameras"));
+ s=chooseBlueCourier(s,"compassion");
+ assert.equal(s.case8.courierTrust,1);
+ const n=s.clues.length;
+ s=chooseBlueCourier(s,"ask");
+ assert.equal(s.clues.length,n,"cannot farm testimony");
+ assert.equal(s.case8.courierAsked.length,3);
+ s=chooseBlueCourier(s,"close");
+ assert.equal(s.case8.dialogue,null);
+});
+test("switching office hides Marmont plate and pre-murder surveillance request",()=>{
+ let s=step(reachBlue(),"GO","switchroom");
+ assert.equal(s.room,"switchOffice");
+ assert.equal(visibleTargets(s).some(([id])=>id==="plate"),false);
+ s=step(s,"TAKE","plate");
+ assert.equal(s.case8.plateTaken,false);
+ s=step(s,"OPEN","cabinet");
+ assert.equal(visibleTargets(s).some(([id])=>id==="plate"),true);
+ s=step(s,"TAKE","plate");
+ s=step(s,"LOOK","log");
+ assert.ok(s.inventory.includes("marmont-plate"));
+ assert.ok(s.clues.includes("hotel-surveillance-order"));
+ assert.ok(s.clues.includes("marmont-camera"));
+});
+test("projection film requires all originals, wrong splice order rewinds, correct one unlocks door",()=>{
+ let s=step(reachBlue(),"GO","screening");
+ s=step(s,"OPEN","projector");
+ assert.equal(s.case8.splicePanel,false);
+ s=step(s,"TAKE","hotel");
+ s=step(s,"TAKE","witness");
+ s=step(s,"TAKE","funds");
+ s=step(s,"OPEN","projector");
+ assert.equal(s.case8.splicePanel,false,"glass plate required");
+ s=step(s,"GO","exit");
+ s=step(s,"GO","switchroom");
+ s=step(s,"OPEN","cabinet");
+ s=step(s,"TAKE","plate");
+ s=step(s,"GO","exit");
+ s=step(s,"GO","screening");
+ s=step(s,"OPEN","splice");
+ assert.equal(SPLICE_OPTIONS.length,4);
+ s=chooseSplice(s,"funds");
+ assert.deepEqual(s.case8.spliceOrder,[]);
+ s=chooseSplice(s,"hotel");
+ assert.deepEqual(s.case8.spliceOrder,["hotel"]);
+ s=chooseSplice(s,"funds");
+ assert.deepEqual(s.case8.spliceOrder,[]);
+ s=chooseSplice(s,"hotel");
+ s=chooseSplice(s,"witness");
+ s=chooseSplice(s,"funds");
+ assert.equal(s.case8.reelSolved,true);
+ assert.ok(s.clues.includes("marmont-reconstruction"));
+ s=step(s,"GO","exit");
+ s=step(s,"GO","blueDoor");
+ assert.equal(s.room,"blueChamber");
+});
+test("The Blue Door stays locked until the film has been rebuilt",()=>{
+ let s=reachBlue();
+ s=step(s,"GO","blueDoor");
+ assert.equal(s.room,"bluePassage");
+ s=step(s,"LOOK","blueDoor");
+ assert.ok(s.transcript.at(-1).text.includes("electric deadbolt"));
+});
+test("Blue Chamber original film, letter and memory must be recovered before ending",()=>{
+ let s=openBlueDoor(reachBlue());
+ s=step(s,"TALK","telephone");
+ assert.equal(s.case8.finalePanel,false);
+ s=step(s,"TAKE","negative");
+ assert.ok(s.inventory.includes("original-negative"));
+ assert.ok(s.memories.includes("marmont-camera-memory"));
+ s=step(s,"TALK","telephone");
+ assert.equal(s.case8.finalePanel,false);
+ s=step(s,"TAKE","letter");
+ assert.ok(s.clues.includes("signed-versus-ordered"));
+ s=step(s,"LOOK","clock");
+ s=step(s,"LOOK","symbol");
+ assert.ok(s.clues.includes("tampered-time"));
+ assert.ok(s.clues.includes("silhouette-emblem"));
+ s=step(s,"TALK","telephone");
+ assert.equal(s.case8.finalePanel,true);
+});
+test("Blue Door finale protects evidence under distinct Vera and solo branches",()=>{
+ let s=openBlueDoor(reachBlue("secure"));
+ s=step(s,"TAKE","negative");
+ s=step(s,"TAKE","letter");
+ s=step(s,"TALK","telephone");
+ assert.equal(FINALE_OPTIONS.length,3);
+ const vera=chooseBlueFinale(s,"vera"),solo=chooseBlueFinale(s,"solo");
+ assert.equal(vera.status,"chapter8complete");
+ assert.equal(solo.status,"chapter8complete");
+ assert.equal(vera.case8.choice,"vera");
+ assert.equal(solo.case8.choice,"solo");
+ assert.ok(vera.clues.includes("vera-original-film"));
+ assert.ok(solo.clues.includes("solo-original-film"));
+ assert.ok(vera.transcript.some(x=>x.text.includes("Kingfisher remains a shadow")));
+ assert.equal(step(vera,"GO","door").status,"chapter8complete");
+ assert.deepEqual(vera.inventory,solo.inventory);
+});
+test("Blue Door save v8 preserves previous chapter decisions and partial reel",()=>{
+ let s=reachProjection(reachBlue("secure"));
+ s=chooseSplice(s,"hotel");
+ const restored=validateSave(JSON.parse(JSON.stringify(s)));
+ assert.equal(restored.version,SAVE_VERSION);
+ assert.equal(restored.chapter,8);
+ assert.deepEqual(restored.case8.spliceOrder,["hotel"]);
+ assert.deepEqual(restored.case8.filmTaken,["hotel","witness","funds"]);
+ assert.equal(restored.case7.choice,"secure");
+ assert.equal(restored.case6.decision,"warn");
+ assert.equal(restored.case5.decision,"protect");
+ assert.ok(restored.inventory.includes("marmont-plate"));
+ for(const version of [1,2,3,4,5,6,7]){
+  const legacy={...initialState(),version};
+  delete legacy.case8;
+  const migrated=validateSave(legacy);
+  assert.equal(migrated.version,SAVE_VERSION);
+  assert.equal(migrated.chapter,1);
+ }
+});
+test("Blue Door malformed save fields are normalized without injection or duplicate evidence",()=>{
+ let s=reachProjection(reachBlue());
+ s.case8.courierTrust=1000;
+ s.case8.courierAsked=["ask","bad","ask","show"];
+ s.case8.filmTaken=["hotel","bad","witness","hotel"];
+ s.case8.spliceOrder=["funds","hotel","witness"];
+ s.case8.dialogue="unrecognized";
+ s.case8.choice="invalid";
+ const loaded=validateSave(s);
+ assert.equal(loaded.case8.courierTrust,3);
+ assert.deepEqual(loaded.case8.courierAsked,["ask","show"]);
+ assert.deepEqual(loaded.case8.filmTaken,["hotel","witness"]);
+ assert.deepEqual(loaded.case8.spliceOrder,[]);
+ assert.equal(loaded.case8.dialogue,null);
+ assert.equal(loaded.case8.choice,"");
 });
