@@ -1,10 +1,12 @@
 import {
-  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, chooseDialogue, TOMMY_OPTIONS,
+  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, chooseDialogue, TOMMY_OPTIONS,
   ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
 } from "./engine.js";
 import { drawChapter2 } from "./chapter2-art.js";
 import { drawAgencyChapter } from "./chapter3-art.js";
 import { drawManor } from "./chapter4-art.js";
+import { drawWarehouse } from "./chapter5-art.js";
+import { WATCHMAN_OPTIONS, TUNNEL_OPTIONS, chooseWatchman, adjustFreightSeal, submitFreightSeal, chooseTunnel } from "./chapter5.js";
 import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "./chapter4.js";
 import { BOARD_OPTIONS, adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice } from "./chapter3.js";
 
@@ -103,6 +105,33 @@ Object.assign(descriptions,{
   "public-confrontation":"Vincent confronted Harold with Vera still present.",
   "private-confrontation":"Vincent allowed Vera to leave before questioning Harold."
 });
+Object.assign(names,{
+ "freight-manifest":"Freight manifest","wire-recording":"Eleanor recording",
+ "transfer-roster":"Passenger roster","burned-photo":"Burned barge photo",
+ "warehouse-quay":"Quay Four","warehouse-shift":"First tide shift",
+ "warehouse-seal-bay":"Bay Seven","warehouse-shipment":"Unregistered transfer",
+ "kingfisher-docks":"Kingfisher dock pass","watchman-tip":"Watchman lead",
+ "protected-barge":"Protected barge","warehouse-opened":"Freight seal opened",
+ "eleanor-voice":"Eleanor wire message","warehouse-voice":"Eleanor's voice",
+ "eleanor-transfer":"Eleanor transfer record","barge-photo":"Burned photo",
+ "protected-witness":"Protected witnesses","public-record":"Public copies"
+});
+Object.assign(descriptions,{
+ "warehouse-quay":"The dock notice says Quay Four.",
+ "warehouse-shift":"The crane's first shift bell bears a ONE.",
+ "warehouse-seal-bay":"The freight container is marked Bay Seven.",
+ "warehouse-shipment":"An unregistered passenger transfer appears on the manifest.",
+ "kingfisher-docks":"The K chip unlocks access to a hidden dockside operation.",
+ "watchman-tip":"An unregistered transfer is concealed in the warehouse office.",
+ "protected-barge":"The harbor radio is concealing a barge.",
+ "warehouse-opened":"Three-digit freight seal opened from shipping records.",
+ "eleanor-voice":"Eleanor describes being moved by Kingfisher associates.",
+ "warehouse-voice":"Eleanor calls out to Vincent through static.",
+ "eleanor-transfer":"The roster places Eleanor on a secret passenger shipment.",
+ "barge-photo":"A photo shows Eleanor boarding a clandestine barge.",
+ "protected-witness":"Vincent kept the originals and shielded worker identities.",
+ "public-record":"Vincent left copies for investigators, risking information leaks."
+});
 const zones = {
   bathroom: [
     ["mirror", 107, 29, 102, 103], ["cabinet", 22, 43, 69, 92],
@@ -172,6 +201,30 @@ const zones = {
     ["diary",216,127,46,26],["foyerdoor",294,24,26,176]
   ]
 };
+Object.assign(zones,{
+ dockGate:[
+  ["watchman",8,74,55,126],["poster",65,120,29,48],
+  ["sign",158,174,150,25],["gate",95,61,218,110],
+  ["water",122,187,180,13],["truck",145,83,111,59]
+ ],
+ loadingBay:[
+  ["office",1,64,94,84],["container",119,47,190,123],
+  ["crane",18,10,198,69],["stencil",254,73,65,34],
+  ["door",0,157,92,42],["rail",114,168,195,32],["lamp",89,22,22,22]
+ ],
+ freightOffice:[
+  ["cabinet",12,30,112,117],["manifest",28,70,80,39],
+  ["radio",150,100,58,36],["desk",126,131,173,69],
+  ["photo",263,19,56,52],["window",148,17,101,91],
+  ["door",303,65,17,120]
+ ],
+ containerHold:[
+  ["recorder",128,92,104,43],["roster",224,127,62,43],
+  ["crate",9,137,106,63],["photo",41,148,41,31],
+  ["vent",250,15,65,65],["tunnel",247,68,72,129],
+  ["door",0,40,18,96]
+ ]
+});
 const palette = {
   bg: "#0b0e1c", tile: "#282735", gold: "#c6a976", blue: "#66858f",
   shadow: "#101320", gray: "#6a6974", red: "#ad3a44",
@@ -326,7 +379,7 @@ function drawAlley() {
   for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
 }
 function drawRain() {
-  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate"].includes(state.room))return;
+  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay"].includes(state.room))return;
   for(let i=0;i<47;i++){
     const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
     line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
@@ -341,6 +394,7 @@ function drawScene(){
   else if(room==="alley")drawAlley();
   else if(room==="office"||room==="archive")drawAgencyChapter(ctx,state,frame);
   else if(["manorGate","manorFoyer","manorStudy","eleanorRoom"].includes(room))drawManor(ctx,state,frame);
+  else if(["dockGate","loadingBay","freightOffice","containerHold"].includes(room))drawWarehouse(ctx,state,frame);
   else drawChapter2(ctx,state,frame);
   drawRain();
   // cinematic pixel border
@@ -354,9 +408,9 @@ function drawScene(){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
     textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
   }
-  if(["chapter2complete","chapter3complete","chapter4complete"].includes(state.status)){
+  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete"].includes(state.status)){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
-    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE"}[state.status];
+    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE"}[state.status];
     textAt(label,62,40,"#f2d092",12);
   }
 }
