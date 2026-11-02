@@ -2198,3 +2198,27 @@ test("Corrupt v12 save state is normalized, including fake findings and hostile 
  assert.equal(v.case12.dialogue,null);
  assert.equal(v.case12.decision,"");
 });
+
+test("twelve-chapter save roundtrip does not truncate mature evidence or discovered rooms",()=>{
+ let s=reachAlibiBoard();
+ assert.ok(s.inventory.length>50,"the real cross-chapter inventory must exceed the old 50-item cap");
+ assert.ok(s.clues.length>80,"the long case should exceed the old notebook cap");
+ const saved=validateSave(JSON.parse(JSON.stringify(s)));
+ assert.deepEqual(saved.inventory,s.inventory);
+ assert.deepEqual(saved.clues,s.clues);
+ assert.deepEqual(saved.memories,s.memories);
+ assert.deepEqual(saved.discovered,s.discovered);
+ assert.ok(saved.inventory.includes("mercer-death-docket"));
+ assert.ok(saved.inventory.includes("morrow-cafe-receipt"));
+ assert.ok(saved.clues.includes("mercer-identity-confirmed"));
+});
+test("save normalization deduplicates IDs and ignores overlong malicious identifiers",()=>{
+ const s=reachAlibi();
+ s.inventory.push("street-negative","street-negative","x".repeat(1000));
+ s.clues.push("alibi-repeated","alibi-repeated","z".repeat(1024));
+ const v=validateSave(s);
+ assert.equal(v.inventory.filter(x=>x==="street-negative").length,1);
+ assert.equal(v.clues.filter(x=>x==="alibi-repeated").length,1);
+ assert.ok(v.inventory.every(x=>x.length<=128));
+ assert.ok(v.clues.every(x=>x.length<=128));
+});
