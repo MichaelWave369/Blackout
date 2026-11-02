@@ -602,7 +602,12 @@ function render(){
   const watchmanPanel=warehousePlaying&&state.room==="dockGate"&&warehouse?.dialogue==="watchman";
   const sealPanel=warehousePlaying&&state.room==="loadingBay"&&warehouse?.sealPanel&&!warehouse?.sealOpen;
   const tunnelPanel=warehousePlaying&&state.room==="containerHold"&&warehouse?.tunnelPanel;
-  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel);
+  const rails=state.case6;
+  const railsPlaying=state.chapter===6&&state.status==="playing";
+  const elsiePanel=railsPlaying&&state.room==="railPlatform"&&rails?.dialogue==="elsie";
+  const switchPanel=railsPlaying&&state.room==="signalCabin"&&rails?.switchPanel&&!rails?.signalsAligned;
+  const exchangePanel=railsPlaying&&state.room==="ghostTrain"&&rails?.exitPanel;
+  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel||elsiePanel||switchPanel||exchangePanel);
   if(crimeChoice){
     const strong=document.createElement("strong");strong.textContent="A CHOICE: WHAT DO YOU DO WITH THE CRIME SCENE?";choices.appendChild(strong);
     choices.appendChild(makeButton("PRESERVE EVIDENCE",()=>{state=chooseEvidence(state,"preserve");commit();}));
@@ -702,6 +707,32 @@ function render(){
     const heading=document.createElement("strong");heading.textContent="SERVICE TUNNEL / CHOOSE WHAT TO PROTECT";choices.appendChild(heading);
     TUNNEL_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
       state=chooseTunnel(state,option.id);commit();
+    })));
+  }
+  if(elsiePanel){
+    const heading=document.createElement("strong");heading.textContent="ELSIE VALE / PLATFORM ZERO";choices.appendChild(heading);
+    ELSIE_OPTIONS.forEach(option=>{
+      const button=makeButton(option.label,()=>{state=chooseElsie(state,option.id);commit();});
+      button.disabled=rails.elsieAsked.includes(option.id);
+      choices.appendChild(button);
+    });
+  }
+  if(switchPanel){
+    const heading=document.createElement("strong");heading.textContent="SIGNAL BOARD / RESTORE CAR 09 ROUTE";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Sequence: "+(rails.switchSequence.length?rails.switchSequence.join(" → "):"NONE")+". Find the emergency map or signed dispatch timetable for the route.";
+    choices.appendChild(hint);
+    SWITCH_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseSignal(state,option.id);commit();
+    })));
+  }
+  if(exchangePanel){
+    const heading=document.createElement("strong");heading.textContent="THE OLD EXCHANGE / YOUR NEXT MOVE";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Keep Eleanor's ticket and the original Kingfisher ledger safe before descending.";
+    choices.appendChild(hint);
+    EXIT_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseExchange(state,option.id);commit();
     })));
   }
   drawScene();
