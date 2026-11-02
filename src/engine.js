@@ -753,11 +753,14 @@ export function validateSave(value) {
   safe.case12 = safe.chapter === 12 ? sanitizeAlibiCase(value.case12) : null;
   safe.rapport = Number.isFinite(value.rapport) ? Math.max(-3, Math.min(3, value.rapport)) : 0;
   safe.dialogue = value.dialogue === "tommy" && value.room === "lounge" ? "tommy" : null;
-  safe.inventory = value.inventory.filter(x => typeof x === "string").slice(0,50);
-  safe.clues = value.clues.filter(x => typeof x === "string").slice(0,80);
-  safe.memories = value.memories.filter(x => typeof x === "string").slice(0,80);
-  safe.discovered = value.discovered.filter(x => typeof x === "string").slice(0,50);
-  safe.opened = value.opened.filter(x => typeof x === "string").slice(0,50);
+  // Twelve chapters can legitimately contain more than 50 original evidence items.
+  // Keep bounded, unique, short identifiers without silently discarding later chapters.
+  const identifiers=(values,max)=>[...new Set(values.filter(x=>typeof x==="string"&&x.length>0&&x.length<=128))].slice(0,max);
+  safe.inventory = identifiers(value.inventory,256);
+  safe.clues = identifiers(value.clues,512);
+  safe.memories = identifiers(value.memories,256);
+  safe.discovered = identifiers(value.discovered,128);
+  safe.opened = identifiers(value.opened,128);
   for (const flag of Object.keys(safe.flags)) {
     if (typeof safe.flags[flag] === typeof value.flags[flag]) safe.flags[flag] = value.flags[flag];
   }
