@@ -38,7 +38,9 @@ export function drawNorthCanal(ctx,state,frame=0){
   R(45,133,28,13,"#242b34");R(51,136,17,6,"#b09a79");
   // maintenance sign
   R(1,38,41,28,"#c7b194");T("LOCK",5,50,"#53434b",9);T("BARGE",4,61,"#53434b",8);
-  river(166);
+  // Keep river reflections to the right of the towpath so Iris stays fully visible.
+  R(173,166,147,34,"#1b3b48");
+  for(let i=0;i<14;i++){const x=177+(i*17+frame*2)%144,y=169+(i*11)%30;L(x,y,Math.min(320,x+8),y,"#67838c");}
   for(let i=0;i<24;i++){const x=(i*19+frame*3)%321,y=(i*29+frame*4)%168;L(x,y,x-2,y+8,"#718da94b");}
   T("NORTH CANAL",185,188,"#c1bfad",10);
  }else if(state.room==="relayHut"){
