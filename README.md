@@ -3,6 +3,33 @@
 
 A retro-first, VR-bound 1947 Chicago noir mystery starring private investigator **Vincent Morrow**.
 
+## Rung 10: North Canal (v1.0.0)
+
+**Ten linked retro detective chapters.** Complete The Silhouette Network and select **CONTINUE TO CHAPTER 10: NORTH CANAL** in Case Controls. All prior clues, memory fragments, trust outcomes, inventory, and chapter decisions remain in the same portable case file.
+
+### A live SABLE transmission
+- Four new original 320×200 Canvas pixel-art scenes: rain-soaked **canal towpath**, **radio relay hut**, moored **transfer barge**, and **North Canal transmitter control**.
+- Meet **Iris Pike**, the radio engineer who maintained the canal equipment. Her initial trust reflects the Chapter 9 decision to **shield civilian operators** or **trace the live signal**. Showing her the original Silhouette packet authorizes entry to the relay hut even after an earlier accusation.
+- Inside the relay hut, OPEN the calibration cabinet and TAKE the original calibration sheet and signed **SABLE-12 traffic log**. These identify the sequence used to relay the signal.
+- On the barge, OPEN a false-bottom cargo crate to collect the **E.A. transfer tag** and optional blue wool that resembles Eleanor's coat. The manifest links the Exchange to the canal shipment.
+- Use the hut's documents and barge transfer tag to access the transmitter. OPEN the routing panel, reconstruct the original **LOCK → BARGE → TOWER** path and reject a false police channel. A wrong choice resets cleanly.
+- TAKE the printed original trace and TALK to the live receiver. The message places the transfer on a path toward **Lantern House** and triggers **Memory Fragment 10**. This is evidence of the transfer, not proof of Kingfisher's identity.
+- Decide whether to **transmit a diversion to protect Iris** or **pursue the Lantern House transport immediately**. Both endings produce separate saved consequences for Chapter 11.
+
+### Recommended Chapter 10 play path
+1. TALK to Iris at the towpath, show the original Silhouette evidence packet to gain her relay-hut pass.
+2. GO to the relay hut, OPEN the calibration cabinet, TAKE the sheet and traffic log, and inspect the map.
+3. GO to the barge, OPEN the crate, TAKE the cargo tag, and optionally collect the blue wool. Examine the delivery register.
+4. Return to the towpath and GO to the tower. OPEN the router and select the three channels in the documented order.
+5. TAKE the trace, TALK to the live receiver, and choose whether to divert the watchers or pursue the convoy.
+
+### Compatibility and boundaries
+- `src/chapter10.js` contains deterministic state and puzzle rules; `src/chapter10-art.js` renders four original pixel environments. There are no new runtime packages, external images, or cloud accounts.
+- **Save v10** imports v1–v9 exports, keeps the existing browser storage key, and preserves prior Chapter 3–9 snapshots. Earlier chapter choices still influence witnesses.
+- All six verbs **LOOK / TAKE / OPEN / USE / GO / TALK** remain available through keyboard 1–6, the pixel-art scene, and accessible object/action buttons.
+- Offline PWA cache `blackout-north-canal-v10` preloads the new chapter and art, maintaining offline-first play.
+- **No Chapter 11 Lantern House, production audio, multiplayer or Quest 3 XR yet**. Test mouse hotspots, keyboard buttons, mobile and saves manually after a successful Pages deploy.
+
 ## Rung 9: The Silhouette Network (v0.9.0)
 
 **Nine connected playable chapters.** Finish The Blue Door and select **CONTINUE TO CHAPTER 9: THE SILHOUETTE NETWORK** under Case Controls. The game preserves prior evidence, memory, inventory, trust decisions and chapter progress.
@@ -279,6 +306,8 @@ BLACKOUT began in November 2025 as a first-person noir investigation inspired by
 | `src/chapter8-art.js` | Original blue passage, switching office, screening room and observation chamber art |
 | `src/chapter9.js` | Nora Finch conversation, original network route and branch consequences |
 | `src/chapter9-art.js` | Original service foyer, signal map, interception archive and junction scenes |
+| `src/chapter10.js` | North Canal witness, relay files, signal puzzle and Lantern House consequence paths |
+| `src/chapter10-art.js` | Original towpath, hut, barge and transmission control scenes |
 | `sw.js` | Offline app shell |
 | `test/engine.test.mjs` | Native Node tests |
 | `.github/workflows/test.yml` | CI on PRs and pushes |
