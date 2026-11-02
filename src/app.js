@@ -866,7 +866,9 @@ function render(){
     canalWalk:"NORTH CANAL / 6:29 AM",relayHut:"RELAY HUT / 6:37 AM",
     bargeDeck:"TRANSFER BARGE / 6:44 AM",towerControl:"TRANSMITTER / 6:52 AM",
     lanternLanding:"LANTERN HOUSE / 7:06 AM",lanternGreenhouse:"GREENHOUSE / 7:13 AM",
-    lanternControl:"SECURITY CONTROL / 7:22 AM",eleanorWard:"ELEANOR'S WARD / 7:31 AM"
+    lanternControl:"SECURITY CONTROL / 7:22 AM",eleanorWard:"ELEANOR'S WARD / 7:31 AM",
+    safehouse:"SAFEHOUSE / 8:10 AM",hotelAnnex:"MARMONT RECORDS / 8:34 AM",
+    coronerOffice:"CORONER'S ANNEX / 9:03 AM",reconstructionDesk:"THE LAST ALIBI / 9:41 AM"
   }[state.room];
   $("objective").textContent=state.status==="caught"?"CASE STATUS: ARRESTED":
     state.status==="escaped"?"CHAPTER COMPLETE: CONTINUE BELOW":
@@ -880,6 +882,7 @@ function render(){
     state.status==="chapter9complete"?"CHAPTER COMPLETE: NORTH CANAL AWAITS":
     state.status==="chapter10complete"?"CHAPTER COMPLETE: LANTERN HOUSE AWAITS":
     state.status==="chapter11complete"?"CHAPTER COMPLETE: THE LAST ALIBI AWAITS":
+    state.status==="chapter12complete"?"CHAPTER COMPLETE: THE MASKED PATRON AWAITS":
     ({bathroom:"OBJECTIVE: RECOVER YOUR IDENTITY",suite:"OBJECTIVE: FIND CLUES AND ESCAPE",
     escape:"OBJECTIVE: DESCEND TO THE ALLEY",alley:"OBJECTIVE: REACH THE CRIMSON LOUNGE",
     street:state.inventory.includes("lighter")?"OBJECTIVE: FIND THE DETECTIVE AGENCY":"OBJECTIVE: ENTER THE CRIMSON LOUNGE",
@@ -917,9 +920,13 @@ function render(){
     lanternLanding:"OBJECTIVE: GAIN ADA'S TRUST AND OPEN THE SERVICE GATE",
     lanternGreenhouse:"OBJECTIVE: FIND THE SURVEY AND PIER TIDE CARD",
     lanternControl:state.case11?.wardOpen?"OBJECTIVE: REACH ELEANOR":"OBJECTIVE: BUILD A SAFE EVACUATION PLAN",
-    eleanorWard:state.case11?.eleanorMet?"OBJECTIVE: SECURE TESTIMONY AND EVACUATE":"OBJECTIVE: SPEAK TO ELEANOR"}[state.room]);
+    eleanorWard:state.case11?.eleanorMet?"OBJECTIVE: SECURE TESTIMONY AND EVACUATE":"OBJECTIVE: SPEAK TO ELEANOR",
+    safehouse:"OBJECTIVE: RECOVER THE STREET NEGATIVE",
+    hotelAnnex:"OBJECTIVE: IDENTIFY THE GUEST AND SHOT TIME",
+    coronerOffice:"OBJECTIVE: VERIFY THE DEAD MAN'S IDENTITY",
+    reconstructionDesk:state.case12?.boardSolved?"OBJECTIVE: SECURE AND DECIDE THE ALIBI":"OBJECTIVE: RECONSTRUCT THE THREE EVIDENCE CHAINS"}[state.room]);
   $("policeStatus").textContent=state.status==="caught"?"POLICE: HERE":
-    state.chapter===11?"DANGER: LANTERN WATCHERS":state.chapter===10?"DANGER: SIGNAL PURSUIT":state.chapter===9?"DANGER: NETWORK LISTENING":state.chapter===8?"DANGER: UNDER OBSERVATION":state.chapter===7?"DANGER: ANONYMOUS WATCHERS":state.chapter===6?"DANGER: BELOW THE CITY":state.chapter===5?"DANGER: DOCK WATCH":state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
+    state.chapter===12?"DANGER: THE WATCHERS ARE LISTENING":state.chapter===11?"DANGER: LANTERN WATCHERS":state.chapter===10?"DANGER: SIGNAL PURSUIT":state.chapter===9?"DANGER: NETWORK LISTENING":state.chapter===8?"DANGER: UNDER OBSERVATION":state.chapter===7?"DANGER: ANONYMOUS WATCHERS":state.chapter===6?"DANGER: BELOW THE CITY":state.chapter===5?"DANGER: DOCK WATCH":state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
     state.pressure>=25?"POLICE: AT THE DOOR":state.pressure>=17?"POLICE: APPROACHING":
     state.pressure>=9?"POLICE: SIRENS":"POLICE: DISTANT";
   $("storyMode").checked=state.storyMode;
@@ -933,7 +940,12 @@ function render(){
   $("continueSilhouetteBtn").hidden=!(state.status==="chapter8complete"&&state.room==="blueChamber"&&state.chapter===8);
   $("continueCanalBtn").hidden=!(state.status==="chapter9complete"&&state.room==="signalJunction"&&state.chapter===9);
   $("continueLanternBtn").hidden=!(state.status==="chapter10complete"&&state.room==="towerControl"&&state.chapter===10);
-  $("relationsPanel").hidden=![4,5,6,7,8,9,10,11].includes(state.chapter);
+  $("continueAlibiBtn").hidden=!(state.status==="chapter11complete"&&state.room==="eleanorWard"&&state.chapter===11);
+  $("relationsPanel").hidden=![4,5,6,7,8,9,10,11,12].includes(state.chapter);
+  if(state.chapter===12&&state.case12){
+    const trust=n=>n>0?"COOPERATIVE":n<0?"WARY":"UNCERTAIN";
+    $("relations").textContent="RUTH: "+trust(state.case12.ruthTrust)+" · CORROBORATED: "+state.case12.links.length+"/3 · ALIBI: "+(state.case12.decision||"PENDING").toUpperCase();
+  }
   if(state.chapter===11&&state.case11){
     const trust=n=>n>0?"COOPERATIVE":n<0?"WARY":"UNCERTAIN";
     const p=state.case11.plan;
@@ -979,7 +991,8 @@ function render(){
     state.status==="chapter8complete"?"Chapter 8 complete. Continue to THE SILHOUETTE NETWORK below.":
     state.status==="chapter9complete"?"Chapter 9 complete. Continue to NORTH CANAL below.":
     state.status==="chapter10complete"?"Chapter 10 complete. Continue to LANTERN HOUSE below.":
-    state.status==="chapter11complete"?"Chapter 11 complete. Eleanor is safe. The Last Alibi awaits in a future update.":
+    state.status==="chapter11complete"?"Chapter 11 complete. Continue to THE LAST ALIBI below.":
+    state.status==="chapter12complete"?"Chapter 12 complete. The Masked Patron awaits in a later chapter.":
     state.status!=="playing"?"Case closed. NEW CASE begins again.":
     verb==="USE"?(item?"USE "+(names[item]||item)+" ON WHAT?":"Choose an inventory item, then choose the target."):
     verb==="TALK"?"Select a person in the scene to question them.":
@@ -1057,7 +1070,12 @@ function render(){
   const adaPanel=lanternPlaying&&state.room==="lanternLanding"&&lantern?.dialogue==="ada";
   const lanternPlanPanel=lanternPlaying&&state.room==="lanternControl"&&lantern?.planOpen&&!lantern.wardOpen;
   const lanternRescuePanel=lanternPlaying&&state.room==="eleanorWard"&&lantern?.evacPanel;
-  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel||elsiePanel||switchPanel||exchangePanel||maraPanel||reconciliationPanel||courierPanel||blueCourierPanel||blueSplicePanel||blueFinalePanel||noraPanel||routingPanel||sourcePanel||irisPanel||canalRouterPanel||canalEndPanel||adaPanel||lanternPlanPanel||lanternRescuePanel);
+  const alibi=state.case12;
+  const alibiPlaying=state.chapter===12&&state.status==="playing";
+  const ruthPanel=alibiPlaying&&state.room==="hotelAnnex"&&alibi?.dialogue==="ruth";
+  const alibiBoardPanel=alibiPlaying&&state.room==="reconstructionDesk"&&alibi?.boardOpen&&!alibi.boardSolved;
+  const alibiEndPanel=alibiPlaying&&state.room==="reconstructionDesk"&&alibi?.endPanel;
+  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel||elsiePanel||switchPanel||exchangePanel||maraPanel||reconciliationPanel||courierPanel||blueCourierPanel||blueSplicePanel||blueFinalePanel||noraPanel||routingPanel||sourcePanel||irisPanel||canalRouterPanel||canalEndPanel||adaPanel||lanternPlanPanel||lanternRescuePanel||ruthPanel||alibiBoardPanel||alibiEndPanel);
   if(crimeChoice){
     const strong=document.createElement("strong");strong.textContent="A CHOICE: WHAT DO YOU DO WITH THE CRIME SCENE?";choices.appendChild(strong);
     choices.appendChild(makeButton("PRESERVE EVIDENCE",()=>{state=chooseEvidence(state,"preserve");commit();}));
@@ -1327,6 +1345,32 @@ function render(){
       state=chooseLanternRescue(state,option.id);commit();
     })));
   }
+  if(ruthPanel){
+    const heading=document.createElement("strong");heading.textContent="RUTH CALDER / MARMONT NIGHT CLERK";choices.appendChild(heading);
+    RUTH_OPTIONS.forEach(option=>{
+      const button=makeButton(option.label,()=>{state=chooseRuth(state,option.id);commit();});
+      button.disabled=alibi.ruthAsked.includes(option.id);choices.appendChild(button);
+    });
+  }
+  if(alibiBoardPanel){
+    const heading=document.createElement("strong");heading.textContent="THE LAST ALIBI / "+alibi.links.length+" OF 3 FINDINGS";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Prove WHO died, WHEN the shot occurred, and WHERE Vincent was. Each link must have independent original evidence.";
+    choices.appendChild(hint);
+    ALIBI_LINKS.forEach(option=>{
+      const button=makeButton((alibi.links.includes(option.id)?"✓ ":"")+option.label,()=>{state=chooseAlibiLink(state,option.id);commit();});
+      button.disabled=alibi.links.includes(option.id);choices.appendChild(button);
+    });
+  }
+  if(alibiEndPanel){
+    const heading=document.createElement("strong");heading.textContent="THE ALIBI / WHO GETS THE ORIGINAL?";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="A filed report may protect Vincent publicly but alert the watchers. Keeping it sealed preserves secrecy while the gunman remains unknown.";
+    choices.appendChild(hint);
+    ALIBI_ENDINGS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseAlibiEnding(state,option.id);commit();
+    })));
+  }
   drawScene();
 }
 canvas.addEventListener("click",e=>{
@@ -1361,6 +1405,7 @@ $("continueBlueBtn").addEventListener("click",()=>{state=continueBlueCase(state)
 $("continueSilhouetteBtn").addEventListener("click",()=>{state=continueSilhouetteCase(state);verb="LOOK";item="";commit();});
 $("continueCanalBtn").addEventListener("click",()=>{state=continueCanalCase(state);verb="LOOK";item="";commit();});
 $("continueLanternBtn").addEventListener("click",()=>{state=continueLanternCase(state);verb="LOOK";item="";commit();});
+$("continueAlibiBtn").addEventListener("click",()=>{state=continueAlibiCase(state);verb="LOOK";item="";commit();});
 $("restartBtn").addEventListener("click",()=>{
   if(!window.confirm("Start a new case? The current auto-save will be replaced. Export first if you want to keep it."))return;
   state=initialState();verb="LOOK";item="";$("fileMessage").textContent="Fresh case opened.";commit();
@@ -1368,7 +1413,7 @@ $("restartBtn").addEventListener("click",()=>{
 $("exportBtn").addEventListener("click",()=>{
   const content=JSON.stringify(state,null,2);
   const url=URL.createObjectURL(new Blob([content],{type:"application/json"}));
-  const a=document.createElement("a");a.href=url;a.download="blackout-case-v11.json";
+  const a=document.createElement("a");a.href=url;a.download="blackout-case-v12.json";
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
   $("fileMessage").textContent="Case file exported. You can restore it later.";
 });
