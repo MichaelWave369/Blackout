@@ -3,6 +3,34 @@
 
 A retro-first, VR-bound 1947 Chicago noir mystery starring private investigator **Vincent Morrow**.
 
+## Rung 8: The Blue Door (v0.8.0)
+
+**The mystery from Vincent's first recovered memory is now playable.** After finishing The Old Exchange, choose **CONTINUE TO CHAPTER 8: THE BLUE DOOR** in Case Controls. The engine carries all previous clues, memories, dialogue and branching consequences.
+
+### The Blue Door investigation
+- Explore four original procedural 320×200 pixel-art rooms: **blue-painted passage**, **surveillance switching office**, **film screening room**, and **Observation Room B**, beyond the iconic steel blue door.
+- Question the same anonymous courier from the Exchange. Your previous **FOLLOW** or **SECURE** choice changes his initial rapport. Learn what he knows about the Marmont Hotel's room-214 camera without immediately discovering who Kingfisher really is.
+- Recover an old glass surveillance plate and investigate a call log: the room-214 recording request was issued **before the murder**.
+- Find three old film strips in the screening room (hotel, witness and money). Reconstruct the footage in the handling-card order. The machine releases the magnetic Blue Door lock only after you have all three strips **and** the original glass plate.
+- Enter the Blue Chamber and recover the **uncut original surveillance negative** and **Eleanor's sealed letter**. The discovery unlocks Vincent's eighth memory fragment and explains why the hotel timeline was manipulated.
+- The letter warns that **Marcus Webb signed the transfer**, but that does not establish who ordered it. The **Silhouette** emblem provides a new direction, not a conclusive identification.
+- At the connected telephone, choose to **entrust Vera with the intact negative** or **keep the original hidden**. Both options create separate persistent outcomes before Chapter 9, tentatively the Silhouette trail.
+
+### How to play
+1. TALK to the courier to question the hotel's pre-positioned camera; showing Webb's signed document provides additional testimony.
+2. GO to the switching office. OPEN the cabinet, TAKE the glass plate, and LOOK at the call log.
+3. GO to the screening room. TAKE the hotel, witness and money film strips. LOOK at the index or graffiti to discover their order.
+4. OPEN the projector or splice table. Select the three strips in the documented order. Incorrect orders rewind safely.
+5. Return to the passage and GO through the Blue Door. TAKE the original negative and Eleanor's letter.
+6. TALK to the chamber telephone and choose how to safeguard the truth.
+
+### Reliability and future work
+- The chapter's deterministic rules are in `src/chapter8.js`, with the original Canvas environments in `src/chapter8-art.js`; all critical interactions also have accessible labeled controls.
+- Versioned save contract **v8** imports **v1–v7** case files without losing prior chapters' collected evidence, witness rapport or decisions. It keeps the original local-browser storage key.
+- Offline cache `blackout-blue-door-v8` includes both new modules. There are no runtime package additions, external images or network-dependent story actions.
+- The game is still retro/browser-first. **Quest 3 XR, multiplayer and production audio are not implemented in this rung.**
+- Browser and headset manual playtesting remain necessary after successful Pages deployment.
+
 ## Rung 7: The Old Exchange (v0.7.0)
 
 **Seven playable chapters.** Once you complete Car 09 in The Forgotten Rails, click **CONTINUE TO CHAPTER 7: THE OLD EXCHANGE** under Case Controls. Vincent carries his historical inventory, trust decisions, clues, memories and solved case boards into the abandoned Exchange.
@@ -200,7 +228,7 @@ To run locally, serve the repository directory through any static HTTP server (f
 ## Narrative origin and production
 BLACKOUT began in November 2025 as a first-person noir investigation inspired by the *feel* of classic detective adventures. The original BLACKOUT master design bible remains the story's authority. This prologue uses the *Marmont Hotel* naming provisionally; archive material also uses *Marlow*, so final naming is a separate canon decision.
 
-**Roadmap:** retro prologue → Crimson Lounge and witnesses → ransacked agency investigation → Ashworth Manor → Warehouse Shadows → Forgotten Rails → Old Exchange → The Blue Door → complete branching noir case → 3D/Quest 3 XR adaptation, preserving a stable versioned clue and decision schema across modes. This version does **not** yet have a VR client or multiplayer.
+**Roadmap:** retro prologue → Crimson Lounge and witnesses → ransacked agency investigation → Ashworth Manor → Warehouse Shadows → Forgotten Rails → Old Exchange → The Blue Door → Silhouette trail → complete branching noir case → 3D/Quest 3 XR adaptation, preserving a stable versioned clue and decision schema across modes. This version does **not** yet have a VR client or multiplayer.
 
 ### Project structure
 | File | Purpose |
@@ -220,6 +248,8 @@ BLACKOUT began in November 2025 as a first-person noir investigation inspired by
 | `src/chapter6-art.js` | Original railway tunnel, cabin, platform and passenger carriage scenes |
 | `src/chapter7.js` | Exchange clerk trust, documentary reconciliation, courier choice |
 | `src/chapter7-art.js` | Service lift, concourse, telegraph room and records vault pixel artwork |
+| `src/chapter8.js` | The Blue Door, courier testimony, film splicing and evidence-consequence finale |
+| `src/chapter8-art.js` | Original blue passage, switching office, screening room and observation chamber art |
 | `sw.js` | Offline app shell |
 | `test/engine.test.mjs` | Native Node tests |
 | `.github/workflows/test.yml` | CI on PRs and pushes |
