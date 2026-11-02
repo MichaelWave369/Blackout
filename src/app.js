@@ -675,7 +675,9 @@ function render(){
     exchangeLanding:"EXCHANGE LIFT / 4:57 AM",exchangeHall:"OLD EXCHANGE / 5:02 AM",
     wireRoom:"TELEGRAPH / 5:09 AM",exchangeVault:"RECORDS VAULT / 5:17 AM",
     bluePassage:"BLUE PASSAGE / 5:28 AM",switchOffice:"SWITCH OFFICE / 5:33 AM",
-    screeningRoom:"SCREENING BOOTH / 5:39 AM",blueChamber:"OBSERVATION ROOM B / 5:46 AM"
+    screeningRoom:"SCREENING BOOTH / 5:39 AM",blueChamber:"OBSERVATION ROOM B / 5:46 AM",
+    networkFoyer:"SILHOUETTE FOYER / 5:58 AM",mapGallery:"CARTOGRAPHY / 6:04 AM",
+    listenArchive:"INTERCEPTION ARCHIVE / 6:10 AM",signalJunction:"SIGNAL JUNCTION / 6:18 AM"
   }[state.room];
   $("objective").textContent=state.status==="caught"?"CASE STATUS: ARRESTED":
     state.status==="escaped"?"CHAPTER COMPLETE: CONTINUE BELOW":
@@ -686,6 +688,7 @@ function render(){
     state.status==="chapter6complete"?"CHAPTER COMPLETE: THE OLD EXCHANGE":
     state.status==="chapter7complete"?"CHAPTER COMPLETE: THE BLUE DOOR AWAITS":
     state.status==="chapter8complete"?"CHAPTER COMPLETE: SILHOUETTE NETWORK":
+    state.status==="chapter9complete"?"CHAPTER COMPLETE: NORTH CANAL AWAITS":
     ({bathroom:"OBJECTIVE: RECOVER YOUR IDENTITY",suite:"OBJECTIVE: FIND CLUES AND ESCAPE",
     escape:"OBJECTIVE: DESCEND TO THE ALLEY",alley:"OBJECTIVE: REACH THE CRIMSON LOUNGE",
     street:state.inventory.includes("lighter")?"OBJECTIVE: FIND THE DETECTIVE AGENCY":"OBJECTIVE: ENTER THE CRIMSON LOUNGE",
@@ -711,9 +714,13 @@ function render(){
     bluePassage:state.case8?.reelSolved?"OBJECTIVE: ENTER THE BLUE DOOR":"OBJECTIVE: REBUILD THE SURVEILLANCE REEL",
     switchOffice:"OBJECTIVE: FIND THE ORIGINAL HOTEL PLATE",
     screeningRoom:"OBJECTIVE: RECONSTRUCT THE FILM",
-    blueChamber:"OBJECTIVE: RECOVER ELEANOR'S ORIGINALS"}[state.room]);
+    blueChamber:"OBJECTIVE: RECOVER ELEANOR'S ORIGINALS",
+    networkFoyer:state.case9?.noraAccess?"OBJECTIVE: INVESTIGATE THE SIGNAL NETWORK":"OBJECTIVE: EARN NORA'S TRUST",
+    mapGallery:"OBJECTIVE: RECOVER THE ROUTE MAP AND REGISTRY",
+    listenArchive:"OBJECTIVE: RECOVER THE OVERNIGHT INTERCEPT LOG",
+    signalJunction:state.case9?.routeSolved?"OBJECTIVE: SAVE THE ORIGINAL SIGNAL PACKET":"OBJECTIVE: TRACE THE THREE-STAGE ROUTE"}[state.room]);
   $("policeStatus").textContent=state.status==="caught"?"POLICE: HERE":
-    state.chapter===8?"DANGER: UNDER OBSERVATION":state.chapter===7?"DANGER: ANONYMOUS WATCHERS":state.chapter===6?"DANGER: BELOW THE CITY":state.chapter===5?"DANGER: DOCK WATCH":state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
+    state.chapter===9?"DANGER: NETWORK LISTENING":state.chapter===8?"DANGER: UNDER OBSERVATION":state.chapter===7?"DANGER: ANONYMOUS WATCHERS":state.chapter===6?"DANGER: BELOW THE CITY":state.chapter===5?"DANGER: DOCK WATCH":state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
     state.pressure>=25?"POLICE: AT THE DOOR":state.pressure>=17?"POLICE: APPROACHING":
     state.pressure>=9?"POLICE: SIRENS":"POLICE: DISTANT";
   $("storyMode").checked=state.storyMode;
@@ -724,7 +731,12 @@ function render(){
   $("continueRailsBtn").hidden=!(state.status==="chapter5complete"&&state.room==="containerHold"&&state.chapter===5);
   $("continueExchangeBtn").hidden=!(state.status==="chapter6complete"&&state.room==="ghostTrain"&&state.chapter===6);
   $("continueBlueBtn").hidden=!(state.status==="chapter7complete"&&state.room==="exchangeVault"&&state.chapter===7);
-  $("relationsPanel").hidden=![4,5,6,7,8].includes(state.chapter);
+  $("continueSilhouetteBtn").hidden=!(state.status==="chapter8complete"&&state.room==="blueChamber"&&state.chapter===8);
+  $("relationsPanel").hidden=![4,5,6,7,8,9].includes(state.chapter);
+  if(state.chapter===9&&state.case9){
+    const trust=n=>n>0?"COOPERATIVE":n<0?"WARY":"UNCERTAIN";
+    $("relations").textContent="NORA: "+trust(state.case9.noraTrust)+" · ROUTE: "+state.case9.routeSequence.length+"/3 · SOURCES: "+(state.case9.decision||"PENDING").toUpperCase();
+  }
   if(state.chapter===8&&state.case8){
     const trust=n=>n>0?"COOPERATIVE":n<0?"WARY":"UNCERTAIN";
     $("relations").textContent="COURIER: "+trust(state.case8.courierTrust)+" · REEL: "+state.case8.spliceOrder.length+"/3 · EVIDENCE: "+(state.case8.choice||"PENDING").toUpperCase();
@@ -754,7 +766,8 @@ function render(){
     state.status==="chapter5complete"?"Chapter 5 complete. Continue to THE FORGOTTEN RAILS below.":
     state.status==="chapter6complete"?"Chapter 6 complete. Continue to THE OLD EXCHANGE below.":
     state.status==="chapter7complete"?"Chapter 7 complete. Continue to THE BLUE DOOR below.":
-    state.status==="chapter8complete"?"Chapter 8 complete. The Silhouette trail continues in a later chapter.":
+    state.status==="chapter8complete"?"Chapter 8 complete. Continue to THE SILHOUETTE NETWORK below.":
+    state.status==="chapter9complete"?"Chapter 9 complete. The North Canal awaits in the next chapter.":
     state.status!=="playing"?"Case closed. NEW CASE begins again.":
     verb==="USE"?(item?"USE "+(names[item]||item)+" ON WHAT?":"Choose an inventory item, then choose the target."):
     verb==="TALK"?"Select a person in the scene to question them.":
@@ -817,7 +830,12 @@ function render(){
   const blueCourierPanel=bluePlaying&&state.room==="bluePassage"&&blue?.dialogue==="courier";
   const blueSplicePanel=bluePlaying&&state.room==="screeningRoom"&&blue?.splicePanel&&!blue?.reelSolved;
   const blueFinalePanel=bluePlaying&&state.room==="blueChamber"&&blue?.finalePanel;
-  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel||elsiePanel||switchPanel||exchangePanel||maraPanel||reconciliationPanel||courierPanel||blueCourierPanel||blueSplicePanel||blueFinalePanel);
+  const silhouette=state.case9;
+  const silhouettePlaying=state.chapter===9&&state.status==="playing";
+  const noraPanel=silhouettePlaying&&state.room==="networkFoyer"&&silhouette?.dialogue==="nora";
+  const routingPanel=silhouettePlaying&&state.room==="signalJunction"&&silhouette?.routePanel&&!silhouette.routeSolved;
+  const sourcePanel=silhouettePlaying&&state.room==="signalJunction"&&silhouette?.sourcePanel;
+  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel||elsiePanel||switchPanel||exchangePanel||maraPanel||reconciliationPanel||courierPanel||blueCourierPanel||blueSplicePanel||blueFinalePanel||noraPanel||routingPanel||sourcePanel);
   if(crimeChoice){
     const strong=document.createElement("strong");strong.textContent="A CHOICE: WHAT DO YOU DO WITH THE CRIME SCENE?";choices.appendChild(strong);
     choices.appendChild(makeButton("PRESERVE EVIDENCE",()=>{state=chooseEvidence(state,"preserve");commit();}));
@@ -995,6 +1013,32 @@ function render(){
       state=chooseBlueFinale(state,option.id);commit();
     })));
   }
+  if(noraPanel){
+    const heading=document.createElement("strong");heading.textContent="NORA FINCH / SILHOUETTE ARCHIVIST";choices.appendChild(heading);
+    NORA_OPTIONS.forEach(option=>{
+      const button=makeButton(option.label,()=>{state=chooseNora(state,option.id);commit();});
+      button.disabled=silhouette.noraAsked.includes(option.id);
+      choices.appendChild(button);
+    });
+  }
+  if(routingPanel){
+    const heading=document.createElement("strong");heading.textContent="SILHOUETTE ROUTER / "+silhouette.routeSequence.length+" OF 3 LINKS";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Reconstruct ORIGIN → RELAY → DESTINATION from the map and intercept log; the police dispatch is a decoy. Selected: "+(silhouette.routeSequence.join(" → ").toUpperCase()||"NONE")+".";
+    choices.appendChild(hint);
+    ROUTER_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseRoute(state,option.id);commit();
+    })));
+  }
+  if(sourcePanel){
+    const heading=document.createElement("strong");heading.textContent="LIVE SIGNAL / PROTECT THE SOURCES?";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Preserve the signal packet and civilian registry before deciding whether to protect operators or pursue the live North Canal lead.";
+    choices.appendChild(hint);
+    SOURCE_OPTIONS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseSource(state,option.id);commit();
+    })));
+  }
   drawScene();
 }
 canvas.addEventListener("click",e=>{
@@ -1026,6 +1070,7 @@ $("continueWarehouseBtn").addEventListener("click",()=>{state=continueWarehouseC
 $("continueRailsBtn").addEventListener("click",()=>{state=continueRailCase(state);verb="LOOK";item="";commit();});
 $("continueExchangeBtn").addEventListener("click",()=>{state=continueExchangeCase(state);verb="LOOK";item="";commit();});
 $("continueBlueBtn").addEventListener("click",()=>{state=continueBlueCase(state);verb="LOOK";item="";commit();});
+$("continueSilhouetteBtn").addEventListener("click",()=>{state=continueSilhouetteCase(state);verb="LOOK";item="";commit();});
 $("restartBtn").addEventListener("click",()=>{
   if(!window.confirm("Start a new case? The current auto-save will be replaced. Export first if you want to keep it."))return;
   state=initialState();verb="LOOK";item="";$("fileMessage").textContent="Fresh case opened.";commit();
@@ -1033,7 +1078,7 @@ $("restartBtn").addEventListener("click",()=>{
 $("exportBtn").addEventListener("click",()=>{
   const content=JSON.stringify(state,null,2);
   const url=URL.createObjectURL(new Blob([content],{type:"application/json"}));
-  const a=document.createElement("a");a.href=url;a.download="blackout-case-v8.json";
+  const a=document.createElement("a");a.href=url;a.download="blackout-case-v9.json";
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
   $("fileMessage").textContent="Case file exported. You can restore it later.";
 });
