@@ -1,5 +1,5 @@
 import {
-  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, chooseDialogue, TOMMY_OPTIONS,
+  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, chooseDialogue, TOMMY_OPTIONS,
   ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
 } from "./engine.js";
 import { drawChapter2 } from "./chapter2-art.js";
@@ -8,6 +8,8 @@ import { drawManor } from "./chapter4-art.js";
 import { drawWarehouse } from "./chapter5-art.js";
 import { drawRails } from "./chapter6-art.js";
 import { drawExchange } from "./chapter7-art.js";
+import { drawBlueDoor } from "./chapter8-art.js";
+import { COURIER_OPTIONS as BLUE_COURIER_OPTIONS, SPLICE_OPTIONS, FINALE_OPTIONS, chooseBlueCourier, chooseSplice, chooseBlueFinale } from "./chapter8.js";
 import { MARA_OPTIONS, BOARD_OPTIONS as EXCHANGE_BOARD_OPTIONS, COURIER_OPTIONS, chooseMara, chooseReconciliation, chooseCourier } from "./chapter7.js";
 import { ELSIE_OPTIONS, SWITCH_OPTIONS, EXIT_OPTIONS, chooseElsie, chooseSignal, chooseExchange } from "./chapter6.js";
 import { WATCHMAN_OPTIONS, TUNNEL_OPTIONS, chooseWatchman, adjustFreightSeal, submitFreightSeal, chooseTunnel } from "./chapter5.js";
@@ -195,6 +197,33 @@ Object.assign(descriptions,{
  "courier-trail":"Vincent pursued a messenger toward the blue-painted passage.",
  "contract-secured":"Vincent preserved the original signed contract rather than following the messenger."
 });
+Object.assign(names,{
+ "marmont-plate":"Marmont surveillance plate","film-hotel":"Hotel film strip",
+ "film-witness":"Woman-in-blue film strip","film-funds":"Financial film strip",
+ "original-negative":"Uncut surveillance negative","eleanor-blue-letter":"Eleanor's Blue Door letter",
+ "blue-splice-order":"Projection order","hotel-surveillance-order":"Pre-shooting call log",
+ "tampered-time":"Altered surveillance clock","silhouette-emblem":"Silhouette emblem",
+ "marmont-camera":"Marmont recording apparatus","marmont-timeline":"The original timeline",
+ "marmont-camera-memory":"Eleanor's hidden key","signed-versus-ordered":"Signature versus authority",
+ "courier-cameras":"Courier camera testimony","courier-webb":"Webb's role",
+ "marmont-reconstruction":"Reconstructed footage","vera-original-film":"Vera receives proof",
+ "solo-original-film":"Vincent keeps the proof"
+});
+Object.assign(descriptions,{
+ "blue-splice-order":"Correct film order: hotel, witness, money.",
+ "hotel-surveillance-order":"Room 214 was watched before the murder and the request bore K.",
+ "tampered-time":"The surveillance chamber clock has been adjusted.",
+ "silhouette-emblem":"Unidentified silhouette symbol on the observation-room wall.",
+ "marmont-camera":"The Marmont recording equipment was installed ahead of time.",
+ "marmont-timeline":"Original negative predates the shooting and contradicts the displayed time.",
+ "marmont-camera-memory":"Eleanor handed Vincent a key and warned of the surveillance.",
+ "signed-versus-ordered":"Eleanor warns Webb's signature may not identify the directing conspirator.",
+ "courier-cameras":"The courier confirms the hotel had been monitored before the murder.",
+ "courier-webb":"The courier recognizes Webb's signature but not the sponsor.",
+ "marmont-reconstruction":"Three clips reveal deliberately planned room 214 surveillance.",
+ "vera-original-film":"Vera received the intact original for safekeeping.",
+ "solo-original-film":"Vincent concealed his discovery to investigate alone."
+});
 const zones = {
   bathroom: [
     ["mirror", 107, 29, 102, 103], ["cabinet", 22, 43, 69, 92],
@@ -334,6 +363,32 @@ Object.assign(zones,{
   ["exit",274,18,46,182],["board",30,17,246,108],
   ["seal",61,120,89,34],["contract",155,124,89,37],
   ["courier",285,73,31,118]
+ ]
+});
+Object.assign(zones,{
+ bluePassage:[
+  ["switchroom",7,52,89,96],["screening",87,91,77,63],
+  ["scratches",4,145,119,49],["graffiti",19,180,273,20],
+  ["brass",155,45,30,50],["blueDoor",176,14,135,152],
+  ["courier",107,81,54,119]
+ ],
+ switchOffice:[
+  ["window",207,15,99,110],["relay",155,30,135,96],
+  ["intercom",289,36,27,65],["log",149,116,75,30],
+  ["cabinet",17,18,121,144],["plate",42,89,59,31],
+  ["exit",289,110,31,87]
+ ],
+ screeningRoom:[
+  ["screen",135,16,169,100],["projector",17,47,122,95],
+  ["index",143,174,145,25],["splice",130,132,185,67],
+  ["hotel",145,150,46,23],["witness",194,150,46,23],
+  ["funds",245,150,46,23],["exit",0,148,44,52]
+ ],
+ blueChamber:[
+  ["cabinet",50,111,209,89],["clock",252,96,53,45],
+  ["symbol",250,25,62,67],["negative",73,115,70,21],
+  ["letter",153,114,73,24],["telephone",9,94,43,72],
+  ["door",299,138,21,62]
  ]
 });
 const palette = {
@@ -490,7 +545,7 @@ function drawAlley() {
   for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
 }
 function drawRain() {
-  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain","exchangeLanding","exchangeHall","wireRoom","exchangeVault"].includes(state.room))return;
+  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain","exchangeLanding","exchangeHall","wireRoom","exchangeVault","bluePassage","switchOffice","screeningRoom","blueChamber"].includes(state.room))return;
   for(let i=0;i<47;i++){
     const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
     line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
@@ -508,6 +563,7 @@ function drawScene(){
   else if(["dockGate","loadingBay","freightOffice","containerHold"].includes(room))drawWarehouse(ctx,state,frame);
   else if(["railTunnel","signalCabin","railPlatform","ghostTrain"].includes(room))drawRails(ctx,state,frame);
   else if(["exchangeLanding","exchangeHall","wireRoom","exchangeVault"].includes(room))drawExchange(ctx,state,frame);
+  else if(["bluePassage","switchOffice","screeningRoom","blueChamber"].includes(room))drawBlueDoor(ctx,state,frame);
   else drawChapter2(ctx,state,frame);
   drawRain();
   // cinematic pixel border
@@ -521,9 +577,9 @@ function drawScene(){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
     textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
   }
-  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete","chapter7complete"].includes(state.status)){
+  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete","chapter7complete","chapter8complete"].includes(state.status)){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
-    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE","chapter7complete":"CHAPTER 7 COMPLETE"}[state.status];
+    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE","chapter7complete":"CHAPTER 7 COMPLETE","chapter8complete":"CHAPTER 8 COMPLETE"}[state.status];
     textAt(label,62,40,"#f2d092",12);
   }
 }
