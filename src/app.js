@@ -438,13 +438,16 @@ function render(){
     street:"CHICAGO / 2:34 AM",lounge:"THE CRIMSON LOUNGE / 2:41 AM",agency:"WEST LAKE ST / 3:02 AM",
     office:"MORROW AGENCY / 3:09 AM",archive:"RECORDS ROOM / 3:16 AM",
     manorGate:"ASHWORTH ESTATE / 11:53 PM",manorFoyer:"ASHWORTH FOYER / 12:02 AM",
-    eleanorRoom:"ELEANOR'S ROOM / 12:11 AM",manorStudy:"ASHWORTH STUDY / 12:15 AM"
+    eleanorRoom:"ELEANOR'S ROOM / 12:11 AM",manorStudy:"ASHWORTH STUDY / 12:15 AM",
+    dockGate:"SOUTH BRANCH / 3:54 AM",loadingBay:"DOCK BAY / 4:03 AM",
+    freightOffice:"DISPATCH / 4:09 AM",containerHold:"K-417 / 4:16 AM"
   }[state.room];
   $("objective").textContent=state.status==="caught"?"CASE STATUS: ARRESTED":
     state.status==="escaped"?"CHAPTER COMPLETE: CONTINUE BELOW":
     state.status==="chapter2complete"?"CHAPTER COMPLETE: THE AGENCY AWAITS":
     state.status==="chapter3complete"?"CHAPTER COMPLETE: ASHWORTH MANOR AT MIDNIGHT":
     state.status==="chapter4complete"?"CHAPTER COMPLETE: SHADOWS IN THE WAREHOUSE":
+    state.status==="chapter5complete"?"CHAPTER COMPLETE: THE OLD CITY RAIL YARDS":
     ({bathroom:"OBJECTIVE: RECOVER YOUR IDENTITY",suite:"OBJECTIVE: FIND CLUES AND ESCAPE",
     escape:"OBJECTIVE: DESCEND TO THE ALLEY",alley:"OBJECTIVE: REACH THE CRIMSON LOUNGE",
     street:state.inventory.includes("lighter")?"OBJECTIVE: FIND THE DETECTIVE AGENCY":"OBJECTIVE: ENTER THE CRIMSON LOUNGE",
@@ -454,16 +457,25 @@ function render(){
     manorGate:"OBJECTIVE: ENTER ASHWORTH MANOR",
     manorFoyer:"OBJECTIVE: QUESTION HAROLD, EXPLORE THE MANOR",
     eleanorRoom:"OBJECTIVE: UNCOVER ELEANOR'S SECRETS",
-    manorStudy:state.case4?.veraAppeared?"OBJECTIVE: SPEAK TO VERA":"OBJECTIVE: UNCOVER THE BLACK K"}[state.room]);
+    manorStudy:state.case4?.veraAppeared?"OBJECTIVE: SPEAK TO VERA":"OBJECTIVE: UNCOVER THE BLACK K",
+    dockGate:"OBJECTIVE: TALK TO THE NIGHT WATCHMAN",
+    loadingBay:state.case5?.sealOpen?"OBJECTIVE: ENTER THE CONTAINER":"OBJECTIVE: FIND THE SHIPPING CODE",
+    freightOffice:"OBJECTIVE: RECOVER THE FREIGHT MANIFEST",
+    containerHold:"OBJECTIVE: FOLLOW ELEANOR'S TRANSFER"}[state.room]);
   $("policeStatus").textContent=state.status==="caught"?"POLICE: HERE":
-    state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
+    state.chapter===5?"DANGER: DOCK WATCH":state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
     state.pressure>=25?"POLICE: AT THE DOOR":state.pressure>=17?"POLICE: APPROACHING":
     state.pressure>=9?"POLICE: SIRENS":"POLICE: DISTANT";
   $("storyMode").checked=state.storyMode;
   $("continueBtn").hidden=!(state.status==="escaped"&&state.room==="alley"&&state.chapter===1);
   $("continueAgencyBtn").hidden=!(state.status==="chapter2complete"&&state.room==="agency"&&state.chapter===2);
   $("continueManorBtn").hidden=!(state.status==="chapter3complete"&&state.room==="office"&&state.chapter===3);
-  $("relationsPanel").hidden=state.chapter!==4;
+  $("continueWarehouseBtn").hidden=!(state.status==="chapter4complete"&&state.room==="manorStudy"&&state.chapter===4);
+  $("relationsPanel").hidden=![4,5].includes(state.chapter);
+  if(state.chapter===5&&state.case5){
+    const trust=n=>n>0?"COOPERATIVE":n<0?"WARY":"UNCERTAIN";
+    $("relations").textContent="DOCK WATCHMAN: "+trust(state.case5.watchmanTrust)+" · EVIDENCE: "+(state.case5.decision||"PENDING").toUpperCase();
+  }
   if(state.chapter===4&&state.case4){
     const trust=n=>n>0?"TRUSTING":n<0?"STRAINED":"UNCERTAIN";
     $("relations").textContent="HAROLD: "+trust(state.case4.haroldTrust)+" · VERA: "+trust(state.case4.veraTrust);
@@ -473,7 +485,8 @@ function render(){
   $("commandTip").textContent=state.status==="escaped"?"Chapter 1 complete. Use CONTINUE TO CHAPTER 2 below.":
     state.status==="chapter2complete"?"Chapter 2 complete. Continue to the agency from the CASE CONTROLS.":
     state.status==="chapter3complete"?"Chapter 3 complete. Continue to ASHWORTH MANOR below.":
-    state.status==="chapter4complete"?"Chapter 4 complete. The Warehouse District awaits in a future update.":
+    state.status==="chapter4complete"?"Chapter 4 complete. Continue to WAREHOUSE SHADOWS below.":
+    state.status==="chapter5complete"?"Chapter 5 complete. The rail yards await in a future update.":
     state.status!=="playing"?"Case closed. NEW CASE begins again.":
     verb==="USE"?(item?"USE "+(names[item]||item)+" ON WHAT?":"Choose an inventory item, then choose the target."):
     verb==="TALK"?"Select a person in the scene to question them.":
@@ -516,7 +529,12 @@ function render(){
   const haroldPanel=manorPlaying&&state.room==="manorFoyer"&&manor?.dialogue==="harold";
   const veraPanel=manorPlaying&&state.room==="manorStudy"&&manor?.dialogue==="vera";
   const portraitPanel=manorPlaying&&state.room==="manorStudy"&&manor?.portraitPanel&&!manor?.portraitUnlocked;
-  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel);
+  const warehouse=state.case5;
+  const warehousePlaying=state.chapter===5&&state.status==="playing";
+  const watchmanPanel=warehousePlaying&&state.room==="dockGate"&&warehouse?.dialogue==="watchman";
+  const sealPanel=warehousePlaying&&state.room==="loadingBay"&&warehouse?.sealPanel&&!warehouse?.sealOpen;
+  const tunnelPanel=warehousePlaying&&state.room==="containerHold"&&warehouse?.tunnelPanel;
+  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel);
   if(crimeChoice){
     const strong=document.createElement("strong");strong.textContent="A CHOICE: WHAT DO YOU DO WITH THE CRIME SCENE?";choices.appendChild(strong);
     choices.appendChild(makeButton("PRESERVE EVIDENCE",()=>{state=chooseEvidence(state,"preserve");commit();}));
@@ -614,6 +632,7 @@ $("storyMode").addEventListener("change",e=>{state=setStoryMode(state,e.target.c
 $("continueBtn").addEventListener("click",()=>{state=continueCase(state);verb="LOOK";item="";commit();});
 $("continueAgencyBtn").addEventListener("click",()=>{state=continueAgencyCase(state);verb="LOOK";item="";commit();});
 $("continueManorBtn").addEventListener("click",()=>{state=continueManorCase(state);verb="LOOK";item="";commit();});
+$("continueWarehouseBtn").addEventListener("click",()=>{state=continueWarehouseCase(state);verb="LOOK";item="";commit();});
 $("restartBtn").addEventListener("click",()=>{
   if(!window.confirm("Start a new case? The current auto-save will be replaced. Export first if you want to keep it."))return;
   state=initialState();verb="LOOK";item="";$("fileMessage").textContent="Fresh case opened.";commit();
@@ -621,7 +640,7 @@ $("restartBtn").addEventListener("click",()=>{
 $("exportBtn").addEventListener("click",()=>{
   const content=JSON.stringify(state,null,2);
   const url=URL.createObjectURL(new Blob([content],{type:"application/json"}));
-  const a=document.createElement("a");a.href=url;a.download="blackout-case-v4.json";
+  const a=document.createElement("a");a.href=url;a.download="blackout-case-v5.json";
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
   $("fileMessage").textContent="Case file exported. You can restore it later.";
 });
