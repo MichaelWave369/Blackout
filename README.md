@@ -3,6 +3,33 @@
 
 A retro-first, VR-bound 1947 Chicago noir mystery starring private investigator **Vincent Morrow**.
 
+## Rung 11: Lantern House (v1.1.0)
+
+**Eleanor is found alive.** The eleven-chapter detective story now has a playable rescue rather than another distant lead. After finishing North Canal, select **CONTINUE TO CHAPTER 11: LANTERN HOUSE** in the Case Controls. Your prior clues, character relationships and original evidence remain in the same save.
+
+### Lantern House investigation
+- Four new original procedural 320×200 pixel-art rooms: the **canal landing**, **frosted-glass greenhouse**, **security control office** and **Eleanor's observation ward**.
+- Meet **Ada Reed**, the estate groundskeeper. Her initial trust changes according to whether Vincent sent the diversion to protect Iris or pursued the North Canal transport. Showing Ada the original SABLE-12 radio trace proves his intentions, grants entry and prevents hostile dialogue from causing a permanent softlock.
+- Recover three independent documents: the original **greenhouse service survey**, **low-tide pier card** and **camera sweep schedule**. You must open the relevant filing cabinets to retrieve hidden evidence.
+- The control office introduces a new **three-part rescue planner**, not a numerical safe or ordered switch puzzle. Choose **APPROACH / POWER / EXIT** based on the documents. Selecting unsafe options produces specific feedback and allows corrections without ending the game.
+- A correct plan opens the magnetic lock to the observation ward. **TALK to Eleanor Ashworth** for a new memory fragment about the Blue Door. Her original signed testimony and the detainee register establish further details without prematurely solving the room-214 murder or revealing Kingfisher.
+- At the ward intercom, decide to **free the other held witnesses and escort Eleanor** or **escape quietly with Eleanor and the evidence**. Both endings rescue Eleanor; the witnesses' fate and Vincent's risk differ and persist for Chapter 12: **The Last Alibi**.
+
+### Playthrough
+1. TALK to Ada at the dock. Show the original SABLE-12 trace to unlock the service greenhouse gate.
+2. GO to the greenhouse. OPEN the tool cabinet, TAKE the original service survey and tide card.
+3. GO to security control. OPEN the watch file cabinet, TAKE the sweep log and OPEN the evacuation board.
+4. Choose the safe approach, power strategy and exit using the three documents, then press **EXECUTE RESCUE PLAN**.
+5. GO into the observation ward. TALK to Eleanor, TAKE her signed letter and the detainee register.
+6. TALK to the intercom. Choose whether to release the other witnesses or leave quietly with Eleanor. Export a save to compare both paths.
+
+### Engineering and continuity
+- Deterministic Chapter 11 engine: `src/chapter11.js`. Original pixel-art locations: `src/chapter11-art.js`. No new third-party runtime packages, art downloads or server requirements.
+- The original **LOOK / TAKE / OPEN / USE / GO / TALK** verbs remain available with keyboard **1–6**, visual hotspots, labeled OBJECTS IN VIEW controls, and HTML buttons for Ada's interview, the rescue planner and the two evacuation choices.
+- **Save v11** imports **v1–v10**, preserving earlier case-state snapshots, the existing local-storage key and portable JSON export/import.
+- Offline PWA cache `blackout-lantern-house-v11` includes both new modules.
+- Chapter 12, actual Kingfisher identity, VR/XR, multiplayer and production audio are **not part of v1.1.0**. Verify touch hotspots, keyboard focus, save import/export and offline first-load behavior on real devices after merge.
+
 ## Rung 10: North Canal (v1.0.0)
 
 **Ten linked retro detective chapters.** Complete The Silhouette Network and select **CONTINUE TO CHAPTER 10: NORTH CANAL** in Case Controls. All prior clues, memory fragments, trust outcomes, inventory, and chapter decisions remain in the same portable case file.
@@ -308,6 +335,8 @@ BLACKOUT began in November 2025 as a first-person noir investigation inspired by
 | `src/chapter9-art.js` | Original service foyer, signal map, interception archive and junction scenes |
 | `src/chapter10.js` | North Canal witness, relay files, signal puzzle and Lantern House consequence paths |
 | `src/chapter10-art.js` | Original towpath, hut, barge and transmission control scenes |
+| `src/chapter11.js` | Ada Reed, evidence-based evacuation plan, Eleanor reunion and branching rescue |
+| `src/chapter11-art.js` | Original Lantern House landing, greenhouse, security office and observation ward scenes |
 | `sw.js` | Offline app shell |
 | `test/engine.test.mjs` | Native Node tests |
 | `.github/workflows/test.yml` | CI on PRs and pushes |

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   initialState, act, chooseEvidence, setStoryMode, validateSave, visibleTargets, SAVE_VERSION,
-  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, continueCanalCase, chooseDialogue, TOMMY_OPTIONS
+  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, continueCanalCase, continueLanternCase, chooseDialogue, TOMMY_OPTIONS
 } from "../src/engine.js";
 import { adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice, BOARD_OPTIONS } from "../src/chapter3.js";
 import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "../src/chapter4.js";
@@ -12,6 +12,7 @@ import { MARA_OPTIONS, BOARD_OPTIONS as EXCHANGE_BOARD_OPTIONS, COURIER_OPTIONS,
 import { COURIER_OPTIONS as BLUE_COURIER_OPTIONS, SPLICE_OPTIONS, FINALE_OPTIONS, chooseBlueCourier, chooseSplice, chooseBlueFinale } from "../src/chapter8.js";
 import { NORA_OPTIONS, ROUTER_OPTIONS, SOURCE_OPTIONS, chooseNora, chooseRoute, chooseSource } from "../src/chapter9.js";
 import { IRIS_OPTIONS, CANAL_ROUTE_OPTIONS, CANAL_END_OPTIONS, chooseIris, chooseCanalRoute, chooseCanalEnd } from "../src/chapter10.js";
+import { ADA_OPTIONS, PLAN_OPTIONS, RESCUE_OPTIONS, chooseAda, chooseLanternPlan, executeLanternPlan, chooseLanternRescue } from "../src/chapter11.js";
 function step(state,verb,target,item="") { return act(state,verb,target,item); }
 function reachSuite(){
   let s=initialState();return step(s,"GO","door");
@@ -1738,4 +1739,234 @@ test("Malformed v10 import clamps trust and rejects injected state or invalid ro
  assert.deepEqual(loaded.case10.routeSequence,[]);
  assert.equal(loaded.case10.dialogue,null);
  assert.equal(loaded.case10.decision,"");
+});
+
+function reachLantern(decision="divert"){
+ let s=unlockCanalRouter();
+ s=step(s,"TAKE","printout");
+ s=step(s,"TALK","receiver");
+ s=chooseCanalEnd(s,decision);
+ assert.equal(s.status,"chapter10complete");
+ s=continueLanternCase(s);
+ assert.equal(s.chapter,11);
+ assert.equal(s.room,"lanternLanding");
+ return s;
+}
+function enterLanternGreenhouse(s){
+ s=step(s,"TALK","ada");
+ assert.equal(s.case11.dialogue,"ada");
+ s=chooseAda(s,"proof");
+ assert.equal(s.case11.accessGranted,true);
+ s=chooseAda(s,"close");
+ s=step(s,"GO","greenhouse");
+ assert.equal(s.room,"lanternGreenhouse");
+ return s;
+}
+function prepareLanternPlan(s){
+ s=enterLanternGreenhouse(s);
+ s=step(s,"OPEN","cabinet");
+ s=step(s,"TAKE","survey");
+ s=step(s,"TAKE","tide");
+ assert.ok(s.inventory.includes("lantern-survey"));
+ assert.ok(s.inventory.includes("lantern-tide-card"));
+ s=step(s,"GO","control");
+ assert.equal(s.room,"lanternControl");
+ s=step(s,"OPEN","files");
+ s=step(s,"TAKE","watchlog");
+ assert.ok(s.inventory.includes("lantern-watchlog"));
+ s=step(s,"OPEN","board");
+ assert.equal(s.case11.planOpen,true);
+ return s;
+}
+function rescuePlan(s){
+ s=prepareLanternPlan(s);
+ s=chooseLanternPlan(s,"approach","greenhouse");
+ s=chooseLanternPlan(s,"power","loop");
+ s=chooseLanternPlan(s,"exit","pier");
+ s=executeLanternPlan(s);
+ assert.equal(s.case11.wardOpen,true);
+ s=step(s,"GO","ward");
+ assert.equal(s.room,"eleanorWard");
+ return s;
+}
+function readyRescue(s){
+ s=rescuePlan(s);
+ s=step(s,"TALK","eleanor");
+ s=step(s,"TAKE","letter");
+ s=step(s,"TAKE","records");
+ s=step(s,"TALK","intercom");
+ assert.equal(s.case11.evacPanel,true);
+ return s;
+}
+test("Chapter 10 rescue decision affects Ada's trust while preserving all earlier cases",()=>{
+ const divert=reachLantern("divert"),pursue=reachLantern("pursue");
+ assert.equal(divert.case11.priorChoice,"divert");
+ assert.equal(pursue.case11.priorChoice,"pursue");
+ assert.equal(divert.case11.adaTrust,1);
+ assert.equal(pursue.case11.adaTrust,-1);
+ assert.equal(divert.case10.decision,"divert");
+ assert.equal(pursue.case10.decision,"pursue");
+ assert.equal(divert.case9.decision,"shield");
+ assert.equal(divert.case8.choice,"vera");
+ assert.equal(divert.case3.boardSolved,true);
+ assert.ok(divert.inventory.includes("sable-trace"));
+ assert.equal(continueLanternCase(divert).room,"lanternLanding","cannot replay transition");
+});
+test("Ada's evidence-based gate cannot be bypassed, and hostile dialogue is recoverable",()=>{
+ let s=reachLantern("pursue");
+ s=step(s,"GO","greenhouse");assert.equal(s.room,"lanternLanding");
+ s=step(s,"GO","front");assert.equal(s.room,"lanternLanding");
+ s=step(s,"TALK","ada");assert.equal(ADA_OPTIONS.length,5);
+ s=chooseAda(s,"accuse");assert.equal(s.case11.adaTrust,-3);
+ s=chooseAda(s,"ask");assert.ok(s.clues.includes("ada-watchers"));
+ s=chooseAda(s,"promise");assert.equal(s.case11.adaTrust,-1);
+ s=chooseAda(s,"proof");
+ assert.equal(s.case11.adaTrust,0);
+ assert.equal(s.case11.accessGranted,true);
+ assert.ok(s.inventory.includes("lantern-service-key"));
+ const n=s.inventory.length;
+ s=chooseAda(s,"proof");assert.equal(s.inventory.length,n);
+ s=chooseAda(s,"close");
+ s=step(s,"GO","greenhouse");assert.equal(s.room,"lanternGreenhouse");
+});
+test("Greenhouse original survey is cabinet-gated and independent tide card accessible",()=>{
+ let s=enterLanternGreenhouse(reachLantern());
+ assert.equal(visibleTargets(s).some(([id])=>id==="survey"),false);
+ s=step(s,"TAKE","survey");
+ assert.ok(!s.inventory.includes("lantern-survey"));
+ s=step(s,"TAKE","tide");
+ assert.ok(s.inventory.includes("lantern-tide-card"));
+ s=step(s,"OPEN","cabinet");
+ assert.equal(visibleTargets(s).some(([id])=>id==="survey"),true);
+ s=step(s,"TAKE","survey");
+ assert.ok(s.clues.includes("lantern-service-approach"));
+ assert.ok(s.clues.includes("lantern-pier-exit"));
+});
+test("Ward planning requires originals; the three categories cannot be guessed through",()=>{
+ let s=enterLanternGreenhouse(reachLantern());
+ s=step(s,"GO","control");
+ s=step(s,"OPEN","board");assert.equal(s.case11.planOpen,false);
+ s=step(s,"GO","ward");assert.equal(s.room,"lanternControl");
+ s=step(s,"OPEN","files");
+ s=step(s,"TAKE","watchlog");
+ s=step(s,"OPEN","board");assert.equal(s.case11.planOpen,false);
+ s=step(s,"GO","greenhouse");
+ s=step(s,"OPEN","cabinet");
+ s=step(s,"TAKE","survey");
+ s=step(s,"GO","control");
+ s=step(s,"OPEN","board");assert.equal(s.case11.planOpen,false,"tide card still missing");
+ s=step(s,"GO","greenhouse");
+ s=step(s,"TAKE","tide");
+ s=step(s,"GO","control");
+ s=step(s,"OPEN","board");assert.equal(s.case11.planOpen,true);
+ assert.equal(Object.keys(PLAN_OPTIONS).length,3);
+});
+test("Wrong rescue plan warns without trapping player and can be corrected selectively",()=>{
+ let s=prepareLanternPlan(reachLantern());
+ assert.equal(PLAN_OPTIONS.approach.length,2);
+ assert.equal(PLAN_OPTIONS.power.length,2);
+ assert.equal(PLAN_OPTIONS.exit.length,2);
+ s=executeLanternPlan(s);
+ assert.equal(s.case11.wardOpen,false);
+ s=chooseLanternPlan(s,"approach","front");
+ s=chooseLanternPlan(s,"power","blackout");
+ s=chooseLanternPlan(s,"exit","street");
+ s=executeLanternPlan(s);
+ assert.equal(s.case11.wardOpen,false);
+ assert.equal(s.case11.alarmCount,1);
+ assert.equal(s.case11.planOpen,true);
+ assert.ok(s.transcript.at(-1).text.includes("greenhouse survey"));
+ s=chooseLanternPlan(s,"approach","greenhouse");
+ s=chooseLanternPlan(s,"power","loop");
+ s=chooseLanternPlan(s,"exit","pier");
+ s=executeLanternPlan(s);
+ assert.equal(s.case11.wardOpen,true);
+ assert.equal(s.case11.planOpen,false);
+ assert.ok(s.clues.includes("lantern-safe-route"));
+});
+test("Vincent finally finds Eleanor alive and recovers her blue-door memory",()=>{
+ let s=rescuePlan(reachLantern());
+ assert.equal(s.room,"eleanorWard");
+ assert.equal(s.case11.eleanorMet,false);
+ s=step(s,"LOOK","eleanor");
+ s=step(s,"TALK","eleanor");
+ assert.equal(s.case11.eleanorMet,true);
+ assert.ok(s.clues.includes("eleanor-found"));
+ assert.ok(s.memories.includes("eleanor-reunion"));
+ assert.ok(s.transcript.some(x=>x.text.includes("I left you the blue-door clue")));
+ s=step(s,"LOOK","witnesses");
+ assert.ok(s.clues.includes("lantern-detainees"));
+});
+test("Lantern finale cannot fire before talking to Eleanor and collecting both originals",()=>{
+ let s=rescuePlan(reachLantern());
+ s=step(s,"TALK","intercom");assert.equal(s.case11.evacPanel,false);
+ s=step(s,"TAKE","letter");
+ s=step(s,"TAKE","records");
+ s=step(s,"TALK","intercom");assert.equal(s.case11.evacPanel,false,"must meet Eleanor");
+ s=step(s,"TALK","eleanor");
+ s=step(s,"TALK","intercom");
+ assert.equal(s.case11.evacPanel,true);
+ assert.ok(s.inventory.includes("eleanor-testimony"));
+ assert.ok(s.inventory.includes("lantern-detainee-register"));
+ assert.ok(s.clues.includes("lantern-masked-orders"));
+});
+test("Chapter 11 endings save different witness fates, both rescue Eleanor",()=>{
+ let s=readyRescue(reachLantern("pursue"));
+ assert.equal(RESCUE_OPTIONS.length,3);
+ let back=chooseLanternRescue(s,"back");
+ assert.equal(back.status,"playing");
+ assert.equal(back.case11.evacPanel,false);
+ const all=chooseLanternRescue(s,"all"),quiet=chooseLanternRescue(s,"quiet");
+ assert.equal(all.status,"chapter11complete");
+ assert.equal(quiet.status,"chapter11complete");
+ assert.equal(all.case11.decision,"all");
+ assert.equal(quiet.case11.decision,"quiet");
+ assert.equal(all.case11.witnessesFreed,true);
+ assert.equal(quiet.case11.witnessesFreed,false);
+ assert.ok(all.clues.includes("lantern-witness-rescue"));
+ assert.ok(quiet.clues.includes("lantern-quiet-escape"));
+ assert.ok(all.clues.includes("eleanor-found"));
+ assert.ok(quiet.clues.includes("eleanor-found"));
+ assert.ok(all.transcript.some(x=>x.text.includes("NEXT: THE LAST ALIBI")));
+ assert.deepEqual(all.inventory,quiet.inventory);
+ assert.equal(step(quiet,"GO","door").status,"chapter11complete");
+});
+test("v11 save retains each earlier case snapshot and an in-progress rescue plan",()=>{
+ let s=prepareLanternPlan(reachLantern("pursue"));
+ s=chooseLanternPlan(s,"approach","greenhouse");
+ s=chooseLanternPlan(s,"power","loop");
+ const restored=validateSave(JSON.parse(JSON.stringify(s)));
+ assert.equal(restored.version,SAVE_VERSION);
+ assert.equal(restored.chapter,11);
+ assert.deepEqual(restored.case11.plan,{approach:"greenhouse",power:"loop",exit:""});
+ assert.equal(restored.case11.planOpen,true);
+ assert.equal(restored.case10.decision,"pursue");
+ assert.equal(restored.case9.decision,"shield");
+ assert.equal(restored.case8.choice,"vera");
+ assert.equal(restored.case7.choice,"follow");
+ assert.equal(restored.case6.decision,"warn");
+ assert.equal(restored.case3.boardSolved,true);
+ for(let version=1;version<=10;version++){
+  const legacy={...initialState(),version};
+  delete legacy.case11;
+  const imported=validateSave(legacy);
+  assert.equal(imported.version,SAVE_VERSION);
+  assert.equal(imported.chapter,1);
+ }
+});
+test("Malicious and malformed Lantern House imports cannot inject dialogue or unsafe plan fields",()=>{
+ let s=prepareLanternPlan(reachLantern());
+ s.case11.adaTrust=666;
+ s.case11.adaAsked=["proof","proof","bad","accuse"];
+ s.case11.plan={approach:"hack",power:"loop",exit:"street",extra:"injected"};
+ s.case11.alarmCount=700;
+ s.case11.dialogue="__proto__";
+ s.case11.decision="hack";
+ const v=validateSave(s);
+ assert.equal(v.case11.adaTrust,3);
+ assert.deepEqual(v.case11.adaAsked,["proof","accuse"]);
+ assert.deepEqual(v.case11.plan,{approach:"",power:"loop",exit:"street"});
+ assert.equal(v.case11.alarmCount,3);
+ assert.equal(v.case11.dialogue,null);
+ assert.equal(v.case11.decision,"");
 });
