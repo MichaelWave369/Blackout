@@ -1,5 +1,5 @@
 import {
-  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, continueCanalCase, continueLanternCase, chooseDialogue, TOMMY_OPTIONS,
+  initialState, validateSave, setStoryMode, act, chooseEvidence, continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, continueCanalCase, continueLanternCase, continueAlibiCase, chooseDialogue, TOMMY_OPTIONS,
   ROOM_NAMES, STORAGE_KEY, VERBS, visibleTargets
 } from "./engine.js";
 import { drawChapter2 } from "./chapter2-art.js";
@@ -12,6 +12,8 @@ import { drawBlueDoor } from "./chapter8-art.js";
 import { drawSilhouette } from "./chapter9-art.js";
 import { drawNorthCanal } from "./chapter10-art.js";
 import { drawLanternHouse } from "./chapter11-art.js";
+import { drawLastAlibi } from "./chapter12-art.js";
+import { RUTH_OPTIONS, ALIBI_LINKS, ALIBI_ENDINGS, chooseRuth, chooseAlibiLink, chooseAlibiEnding } from "./chapter12.js";
 import { ADA_OPTIONS, PLAN_OPTIONS, RESCUE_OPTIONS, chooseAda, chooseLanternPlan, executeLanternPlan, chooseLanternRescue } from "./chapter11.js";
 import { IRIS_OPTIONS, CANAL_ROUTE_OPTIONS, CANAL_END_OPTIONS, chooseIris, chooseCanalRoute, chooseCanalEnd } from "./chapter10.js";
 import { NORA_OPTIONS, ROUTER_OPTIONS, SOURCE_OPTIONS, chooseNora, chooseRoute, chooseSource } from "./chapter9.js";
@@ -322,6 +324,44 @@ Object.assign(descriptions,{
   "lantern-witness-rescue":"Eleanor and other detainees evacuated, drawing attention.",
   "lantern-quiet-escape":"Vincent and Eleanor escaped quietly, leaving other detainees behind."
 });
+Object.assign(names,{
+ "street-negative":"Original street-camera frame","mercer-registration":"Daniel Mercer guest registration",
+ "bellhop-timecard":"Bellhop incident card","hotel-pulse-roll":"Original switchboard roll",
+ "morrow-cafe-receipt":"Vincent's signed café receipt","mercer-death-docket":"Daniel Mercer coroner docket",
+ "mercer-id-seal":"Verified Mercer identification","vincent-alibi":"Original alibi attestation",
+ "ruth-record-key":"Ruth's hotel archive key",
+ "eleanor-alibi-help":"Eleanor's independent camera clue","street-time":"Vincent at café / 2:06",
+ "mercer-hotel":"Mercer's room-214 booking","bellhop-shot":"Shot time / bellhop",
+ "hotel-pulse":"Shot time / switchboard","morrow-receipt":"Vincent's café timestamp",
+ "mercer-victim":"Daniel Mercer identified","mercer-identity-confirmed":"Mercer's confirmed identity",
+ "morrow-cleared-of-shot":"Vincent's corroborated alibi",
+ "autopsy-caution":"Autopsy time caution","eleanor-tape":"Eleanor's recorded account",
+ "ruth-time":"Ruth's timeline testimony","ruth-verified":"Ruth authenticated evidence",
+ "alibi-identity":"Case board / victim","alibi-shot":"Case board / gunshot",
+ "alibi-alibi":"Case board / Vincent","mercer-memory":"The missing gunshot memory",
+ "alibi-filed":"Filed police attestation","alibi-sealed":"Sealed alibi attestation"
+});
+Object.assign(descriptions,{
+ "eleanor-alibi-help":"Eleanor preserved an independent street-facing camera negative.",
+ "street-time":"Uncut street frame puts Vincent at the café when the shot sounded.",
+ "mercer-hotel":"Daniel Mercer, an audit consultant, registered in room 214.",
+ "bellhop-shot":"Original incident record dates the gunshot at 2:06 A.M.",
+ "hotel-pulse":"Independent switchboard pulse corroborates 2:06 A.M.",
+ "morrow-receipt":"Vincent's signed café receipt carries the same timestamp.",
+ "mercer-victim":"Coroner identifies Daniel Mercer as the victim.",
+ "mercer-identity-confirmed":"Fingerprint and family identification independently match the guest card.",
+ "morrow-cleared-of-shot":"The reconstructed originals place Vincent outside when the gunshot occurred.",
+ "autopsy-caution":"The later coroner intake time was not the shooting time.",
+ "eleanor-tape":"Eleanor knows surveillance predated the shooting, not who fired.",
+ "ruth-time":"Ruth recalls the bellhop recording 2:06 on the synchronized desk clock.",
+ "ruth-verified":"Ruth verified Eleanor's signed testimony and opened the archives.",
+ "alibi-identity":"Hotel guest card, death docket and identification seal identify Mercer.",
+ "alibi-shot":"Bellhop and switchboard records independently establish shot time.",
+ "alibi-alibi":"Street negative, receipt and original film establish Vincent's whereabouts.",
+ "mercer-memory":"Vincent remembers someone whispering 'Mercer has the books'.",
+ "alibi-filed":"The authenticated alibi was filed with the police liaison.",
+ "alibi-sealed":"The authenticated alibi was held back from the police."
+});
 const zones = {
   bathroom: [
     ["mirror", 107, 29, 102, 103], ["cabinet", 22, 43, 69, 92],
@@ -567,6 +607,31 @@ Object.assign(zones,{
   ["eleanor",107,60,78,138]
  ]
 });
+Object.assign(zones,{
+ safehouse:[
+  ["cafe",190,14,118,93],["radio",161,107,30,28],
+  ["envelope",44,108,76,29],["streetFrame",65,106,55,28],
+  ["coroner",271,111,48,87],["boardroom",219,119,53,80],
+  ["hotel",0,23,49,116],["eleanor",101,63,57,116]
+ ],
+ hotelAnnex:[
+  ["switchboard",148,12,154,94],["drawer",8,28,127,135],
+  ["card",30,76,42,29],["bell",69,76,49,28],
+  ["till",222,122,75,34],["receipt",242,125,46,26],
+  ["return",294,109,26,91],["ruth",153,95,68,80]
+ ],
+ coronerOffice:[
+  ["window",188,13,101,84],["clock",293,14,26,27],
+  ["cabinet",15,21,139,143],["docket",41,83,45,30],
+  ["seal",88,84,46,29],["telegram",156,109,77,20],
+  ["return",296,99,24,101]
+ ],
+ reconstructionDesk:[
+  ["mirror",0,23,24,105],["dictaphone",50,124,71,26],
+  ["board",29,13,264,119],["attestation",150,130,98,25],
+  ["telephone",245,119,49,36],["door",298,43,22,157]
+ ]
+});
 const palette = {
   bg: "#0b0e1c", tile: "#282735", gold: "#c6a976", blue: "#66858f",
   shadow: "#101320", gray: "#6a6974", red: "#ad3a44",
@@ -721,7 +786,7 @@ function drawAlley() {
   for(let i=0;i<9;i++)rect(190+i*7,183+(i%3)*4,6,2,"#5a3c50");
 }
 function drawRain() {
-  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain","exchangeLanding","exchangeHall","wireRoom","exchangeVault","bluePassage","switchOffice","screeningRoom","blueChamber","networkFoyer","mapGallery","listenArchive","signalJunction","canalWalk","relayHut","bargeDeck","towerControl","lanternLanding","lanternGreenhouse","lanternControl","eleanorWard"].includes(state.room))return;
+  if(["bathroom","suite","lounge","office","archive","manorFoyer","manorStudy","eleanorRoom","manorGate","freightOffice","containerHold","loadingBay","railTunnel","signalCabin","railPlatform","ghostTrain","exchangeLanding","exchangeHall","wireRoom","exchangeVault","bluePassage","switchOffice","screeningRoom","blueChamber","networkFoyer","mapGallery","listenArchive","signalJunction","canalWalk","relayHut","bargeDeck","towerControl","lanternLanding","lanternGreenhouse","lanternControl","eleanorWard","safehouse","hotelAnnex","coronerOffice","reconstructionDesk"].includes(state.room))return;
   for(let i=0;i<47;i++){
     const x=(i*37+frame*2.3)%342-12;const y=(i*31+frame*3.7)%221-10;
     line(x,y,x-2,y+7,i%4===0?"#8b8e9c80":"#637b8960");
@@ -743,6 +808,7 @@ function drawScene(){
   else if(["networkFoyer","mapGallery","listenArchive","signalJunction"].includes(room))drawSilhouette(ctx,state,frame);
   else if(["canalWalk","relayHut","bargeDeck","towerControl"].includes(room))drawNorthCanal(ctx,state,frame);
   else if(["lanternLanding","lanternGreenhouse","lanternControl","eleanorWard"].includes(room))drawLanternHouse(ctx,state,frame);
+  else if(["safehouse","hotelAnnex","coronerOffice","reconstructionDesk"].includes(room))drawLastAlibi(ctx,state,frame);
   else drawChapter2(ctx,state,frame);
   drawRain();
   // cinematic pixel border
@@ -756,9 +822,9 @@ function drawScene(){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
     textAt("CHAPTER 1: ESCAPED",71,40,"#f2d092",12);
   }
-  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete","chapter7complete","chapter8complete","chapter9complete","chapter10complete","chapter11complete"].includes(state.status)){
+  if(["chapter2complete","chapter3complete","chapter4complete","chapter5complete","chapter6complete","chapter7complete","chapter8complete","chapter9complete","chapter10complete","chapter11complete","chapter12complete"].includes(state.status)){
     rect(48,18,228,35,"#101320ee");rect(51,21,222,29,"#64433d");
-    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE","chapter7complete":"CHAPTER 7 COMPLETE","chapter8complete":"CHAPTER 8 COMPLETE","chapter9complete":"CHAPTER 9 COMPLETE","chapter10complete":"CHAPTER 10 COMPLETE","chapter11complete":"CHAPTER 11 COMPLETE"}[state.status];
+    const label={"chapter2complete":"CHAPTER 2 COMPLETE","chapter3complete":"CHAPTER 3 COMPLETE","chapter4complete":"CHAPTER 4 COMPLETE","chapter5complete":"CHAPTER 5 COMPLETE","chapter6complete":"CHAPTER 6 COMPLETE","chapter7complete":"CHAPTER 7 COMPLETE","chapter8complete":"CHAPTER 8 COMPLETE","chapter9complete":"CHAPTER 9 COMPLETE","chapter10complete":"CHAPTER 10 COMPLETE","chapter11complete":"CHAPTER 11 COMPLETE","chapter12complete":"CHAPTER 12 COMPLETE"}[state.status];
     textAt(label,62,40,"#f2d092",12);
   }
 }
@@ -800,7 +866,9 @@ function render(){
     canalWalk:"NORTH CANAL / 6:29 AM",relayHut:"RELAY HUT / 6:37 AM",
     bargeDeck:"TRANSFER BARGE / 6:44 AM",towerControl:"TRANSMITTER / 6:52 AM",
     lanternLanding:"LANTERN HOUSE / 7:06 AM",lanternGreenhouse:"GREENHOUSE / 7:13 AM",
-    lanternControl:"SECURITY CONTROL / 7:22 AM",eleanorWard:"ELEANOR'S WARD / 7:31 AM"
+    lanternControl:"SECURITY CONTROL / 7:22 AM",eleanorWard:"ELEANOR'S WARD / 7:31 AM",
+    safehouse:"SAFEHOUSE / 8:10 AM",hotelAnnex:"MARMONT RECORDS / 8:34 AM",
+    coronerOffice:"CORONER'S ANNEX / 9:03 AM",reconstructionDesk:"THE LAST ALIBI / 9:41 AM"
   }[state.room];
   $("objective").textContent=state.status==="caught"?"CASE STATUS: ARRESTED":
     state.status==="escaped"?"CHAPTER COMPLETE: CONTINUE BELOW":
@@ -814,6 +882,7 @@ function render(){
     state.status==="chapter9complete"?"CHAPTER COMPLETE: NORTH CANAL AWAITS":
     state.status==="chapter10complete"?"CHAPTER COMPLETE: LANTERN HOUSE AWAITS":
     state.status==="chapter11complete"?"CHAPTER COMPLETE: THE LAST ALIBI AWAITS":
+    state.status==="chapter12complete"?"CHAPTER COMPLETE: THE MASKED PATRON AWAITS":
     ({bathroom:"OBJECTIVE: RECOVER YOUR IDENTITY",suite:"OBJECTIVE: FIND CLUES AND ESCAPE",
     escape:"OBJECTIVE: DESCEND TO THE ALLEY",alley:"OBJECTIVE: REACH THE CRIMSON LOUNGE",
     street:state.inventory.includes("lighter")?"OBJECTIVE: FIND THE DETECTIVE AGENCY":"OBJECTIVE: ENTER THE CRIMSON LOUNGE",
@@ -851,9 +920,13 @@ function render(){
     lanternLanding:"OBJECTIVE: GAIN ADA'S TRUST AND OPEN THE SERVICE GATE",
     lanternGreenhouse:"OBJECTIVE: FIND THE SURVEY AND PIER TIDE CARD",
     lanternControl:state.case11?.wardOpen?"OBJECTIVE: REACH ELEANOR":"OBJECTIVE: BUILD A SAFE EVACUATION PLAN",
-    eleanorWard:state.case11?.eleanorMet?"OBJECTIVE: SECURE TESTIMONY AND EVACUATE":"OBJECTIVE: SPEAK TO ELEANOR"}[state.room]);
+    eleanorWard:state.case11?.eleanorMet?"OBJECTIVE: SECURE TESTIMONY AND EVACUATE":"OBJECTIVE: SPEAK TO ELEANOR",
+    safehouse:"OBJECTIVE: RECOVER THE STREET NEGATIVE",
+    hotelAnnex:"OBJECTIVE: IDENTIFY THE GUEST AND SHOT TIME",
+    coronerOffice:"OBJECTIVE: VERIFY THE DEAD MAN'S IDENTITY",
+    reconstructionDesk:state.case12?.boardSolved?"OBJECTIVE: SECURE AND DECIDE THE ALIBI":"OBJECTIVE: RECONSTRUCT THE THREE EVIDENCE CHAINS"}[state.room]);
   $("policeStatus").textContent=state.status==="caught"?"POLICE: HERE":
-    state.chapter===11?"DANGER: LANTERN WATCHERS":state.chapter===10?"DANGER: SIGNAL PURSUIT":state.chapter===9?"DANGER: NETWORK LISTENING":state.chapter===8?"DANGER: UNDER OBSERVATION":state.chapter===7?"DANGER: ANONYMOUS WATCHERS":state.chapter===6?"DANGER: BELOW THE CITY":state.chapter===5?"DANGER: DOCK WATCH":state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
+    state.chapter===12?"DANGER: THE WATCHERS ARE LISTENING":state.chapter===11?"DANGER: LANTERN WATCHERS":state.chapter===10?"DANGER: SIGNAL PURSUIT":state.chapter===9?"DANGER: NETWORK LISTENING":state.chapter===8?"DANGER: UNDER OBSERVATION":state.chapter===7?"DANGER: ANONYMOUS WATCHERS":state.chapter===6?"DANGER: BELOW THE CITY":state.chapter===5?"DANGER: DOCK WATCH":state.chapter===4?"DANGER: EVERYWHERE":state.chapter===3?"POLICE: INVESTIGATING":state.chapter===2?"POLICE: IN THE SHADOWS":state.status==="escaped"?"POLICE: EVADED":
     state.pressure>=25?"POLICE: AT THE DOOR":state.pressure>=17?"POLICE: APPROACHING":
     state.pressure>=9?"POLICE: SIRENS":"POLICE: DISTANT";
   $("storyMode").checked=state.storyMode;
@@ -867,7 +940,12 @@ function render(){
   $("continueSilhouetteBtn").hidden=!(state.status==="chapter8complete"&&state.room==="blueChamber"&&state.chapter===8);
   $("continueCanalBtn").hidden=!(state.status==="chapter9complete"&&state.room==="signalJunction"&&state.chapter===9);
   $("continueLanternBtn").hidden=!(state.status==="chapter10complete"&&state.room==="towerControl"&&state.chapter===10);
-  $("relationsPanel").hidden=![4,5,6,7,8,9,10,11].includes(state.chapter);
+  $("continueAlibiBtn").hidden=!(state.status==="chapter11complete"&&state.room==="eleanorWard"&&state.chapter===11);
+  $("relationsPanel").hidden=![4,5,6,7,8,9,10,11,12].includes(state.chapter);
+  if(state.chapter===12&&state.case12){
+    const trust=n=>n>0?"COOPERATIVE":n<0?"WARY":"UNCERTAIN";
+    $("relations").textContent="RUTH: "+trust(state.case12.ruthTrust)+" · CORROBORATED: "+state.case12.links.length+"/3 · ALIBI: "+(state.case12.decision||"PENDING").toUpperCase();
+  }
   if(state.chapter===11&&state.case11){
     const trust=n=>n>0?"COOPERATIVE":n<0?"WARY":"UNCERTAIN";
     const p=state.case11.plan;
@@ -913,7 +991,8 @@ function render(){
     state.status==="chapter8complete"?"Chapter 8 complete. Continue to THE SILHOUETTE NETWORK below.":
     state.status==="chapter9complete"?"Chapter 9 complete. Continue to NORTH CANAL below.":
     state.status==="chapter10complete"?"Chapter 10 complete. Continue to LANTERN HOUSE below.":
-    state.status==="chapter11complete"?"Chapter 11 complete. Eleanor is safe. The Last Alibi awaits in a future update.":
+    state.status==="chapter11complete"?"Chapter 11 complete. Continue to THE LAST ALIBI below.":
+    state.status==="chapter12complete"?"Chapter 12 complete. The Masked Patron awaits in a later chapter.":
     state.status!=="playing"?"Case closed. NEW CASE begins again.":
     verb==="USE"?(item?"USE "+(names[item]||item)+" ON WHAT?":"Choose an inventory item, then choose the target."):
     verb==="TALK"?"Select a person in the scene to question them.":
@@ -991,7 +1070,12 @@ function render(){
   const adaPanel=lanternPlaying&&state.room==="lanternLanding"&&lantern?.dialogue==="ada";
   const lanternPlanPanel=lanternPlaying&&state.room==="lanternControl"&&lantern?.planOpen&&!lantern.wardOpen;
   const lanternRescuePanel=lanternPlaying&&state.room==="eleanorWard"&&lantern?.evacPanel;
-  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel||elsiePanel||switchPanel||exchangePanel||maraPanel||reconciliationPanel||courierPanel||blueCourierPanel||blueSplicePanel||blueFinalePanel||noraPanel||routingPanel||sourcePanel||irisPanel||canalRouterPanel||canalEndPanel||adaPanel||lanternPlanPanel||lanternRescuePanel);
+  const alibi=state.case12;
+  const alibiPlaying=state.chapter===12&&state.status==="playing";
+  const ruthPanel=alibiPlaying&&state.room==="hotelAnnex"&&alibi?.dialogue==="ruth";
+  const alibiBoardPanel=alibiPlaying&&state.room==="reconstructionDesk"&&alibi?.boardOpen&&!alibi.boardSolved;
+  const alibiEndPanel=alibiPlaying&&state.room==="reconstructionDesk"&&alibi?.endPanel;
+  choices.hidden=!(crimeChoice||tommyChoice||safePanel||boardPanel||safeFilePanel||haroldPanel||veraPanel||portraitPanel||watchmanPanel||sealPanel||tunnelPanel||elsiePanel||switchPanel||exchangePanel||maraPanel||reconciliationPanel||courierPanel||blueCourierPanel||blueSplicePanel||blueFinalePanel||noraPanel||routingPanel||sourcePanel||irisPanel||canalRouterPanel||canalEndPanel||adaPanel||lanternPlanPanel||lanternRescuePanel||ruthPanel||alibiBoardPanel||alibiEndPanel);
   if(crimeChoice){
     const strong=document.createElement("strong");strong.textContent="A CHOICE: WHAT DO YOU DO WITH THE CRIME SCENE?";choices.appendChild(strong);
     choices.appendChild(makeButton("PRESERVE EVIDENCE",()=>{state=chooseEvidence(state,"preserve");commit();}));
@@ -1261,6 +1345,32 @@ function render(){
       state=chooseLanternRescue(state,option.id);commit();
     })));
   }
+  if(ruthPanel){
+    const heading=document.createElement("strong");heading.textContent="RUTH CALDER / MARMONT NIGHT CLERK";choices.appendChild(heading);
+    RUTH_OPTIONS.forEach(option=>{
+      const button=makeButton(option.label,()=>{state=chooseRuth(state,option.id);commit();});
+      button.disabled=alibi.ruthAsked.includes(option.id);choices.appendChild(button);
+    });
+  }
+  if(alibiBoardPanel){
+    const heading=document.createElement("strong");heading.textContent="THE LAST ALIBI / "+alibi.links.length+" OF 3 FINDINGS";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="Prove WHO died, WHEN the shot occurred, and WHERE Vincent was. Each link must have independent original evidence.";
+    choices.appendChild(hint);
+    ALIBI_LINKS.forEach(option=>{
+      const button=makeButton((alibi.links.includes(option.id)?"✓ ":"")+option.label,()=>{state=chooseAlibiLink(state,option.id);commit();});
+      button.disabled=alibi.links.includes(option.id);choices.appendChild(button);
+    });
+  }
+  if(alibiEndPanel){
+    const heading=document.createElement("strong");heading.textContent="THE ALIBI / WHO GETS THE ORIGINAL?";choices.appendChild(heading);
+    const hint=document.createElement("div");hint.className="agency-hint";
+    hint.textContent="A filed report may protect Vincent publicly but alert the watchers. Keeping it sealed preserves secrecy while the gunman remains unknown.";
+    choices.appendChild(hint);
+    ALIBI_ENDINGS.forEach(option=>choices.appendChild(makeButton(option.label,()=>{
+      state=chooseAlibiEnding(state,option.id);commit();
+    })));
+  }
   drawScene();
 }
 canvas.addEventListener("click",e=>{
@@ -1295,6 +1405,7 @@ $("continueBlueBtn").addEventListener("click",()=>{state=continueBlueCase(state)
 $("continueSilhouetteBtn").addEventListener("click",()=>{state=continueSilhouetteCase(state);verb="LOOK";item="";commit();});
 $("continueCanalBtn").addEventListener("click",()=>{state=continueCanalCase(state);verb="LOOK";item="";commit();});
 $("continueLanternBtn").addEventListener("click",()=>{state=continueLanternCase(state);verb="LOOK";item="";commit();});
+$("continueAlibiBtn").addEventListener("click",()=>{state=continueAlibiCase(state);verb="LOOK";item="";commit();});
 $("restartBtn").addEventListener("click",()=>{
   if(!window.confirm("Start a new case? The current auto-save will be replaced. Export first if you want to keep it."))return;
   state=initialState();verb="LOOK";item="";$("fileMessage").textContent="Fresh case opened.";commit();
@@ -1302,7 +1413,7 @@ $("restartBtn").addEventListener("click",()=>{
 $("exportBtn").addEventListener("click",()=>{
   const content=JSON.stringify(state,null,2);
   const url=URL.createObjectURL(new Blob([content],{type:"application/json"}));
-  const a=document.createElement("a");a.href=url;a.download="blackout-case-v11.json";
+  const a=document.createElement("a");a.href=url;a.download="blackout-case-v12.json";
   document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
   $("fileMessage").textContent="Case file exported. You can restore it later.";
 });

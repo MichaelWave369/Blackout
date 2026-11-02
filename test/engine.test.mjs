@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   initialState, act, chooseEvidence, setStoryMode, validateSave, visibleTargets, SAVE_VERSION,
-  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, continueCanalCase, continueLanternCase, chooseDialogue, TOMMY_OPTIONS
+  continueCase, continueAgencyCase, continueManorCase, continueWarehouseCase, continueRailCase, continueExchangeCase, continueBlueCase, continueSilhouetteCase, continueCanalCase, continueLanternCase, continueAlibiCase, chooseDialogue, TOMMY_OPTIONS
 } from "../src/engine.js";
 import { adjustAgencyDial, submitAgencySafe, collectAgencyFile, agencyBoardChoice, BOARD_OPTIONS } from "../src/chapter3.js";
 import { HAROLD_OPTIONS, VERA_OPTIONS, PORTRAIT_OPTIONS, chooseHaroldDialogue, choosePortrait, chooseVeraDecision } from "../src/chapter4.js";
@@ -13,6 +13,7 @@ import { COURIER_OPTIONS as BLUE_COURIER_OPTIONS, SPLICE_OPTIONS, FINALE_OPTIONS
 import { NORA_OPTIONS, ROUTER_OPTIONS, SOURCE_OPTIONS, chooseNora, chooseRoute, chooseSource } from "../src/chapter9.js";
 import { IRIS_OPTIONS, CANAL_ROUTE_OPTIONS, CANAL_END_OPTIONS, chooseIris, chooseCanalRoute, chooseCanalEnd } from "../src/chapter10.js";
 import { ADA_OPTIONS, PLAN_OPTIONS, RESCUE_OPTIONS, chooseAda, chooseLanternPlan, executeLanternPlan, chooseLanternRescue } from "../src/chapter11.js";
+import { RUTH_OPTIONS, ALIBI_LINKS, ALIBI_ENDINGS, chooseRuth, chooseAlibiLink, chooseAlibiEnding } from "../src/chapter12.js";
 function step(state,verb,target,item="") { return act(state,verb,target,item); }
 function reachSuite(){
   let s=initialState();return step(s,"GO","door");
@@ -1969,4 +1970,255 @@ test("Malicious and malformed Lantern House imports cannot inject dialogue or un
  assert.equal(v.case11.alarmCount,3);
  assert.equal(v.case11.dialogue,null);
  assert.equal(v.case11.decision,"");
+});
+
+function reachAlibi(prior="all"){
+ let s=readyRescue(reachLantern());
+ s=chooseLanternRescue(s,prior);
+ assert.equal(s.status,"chapter11complete");
+ s=continueAlibiCase(s);
+ assert.equal(s.chapter,12);
+ assert.equal(s.room,"safehouse");
+ return s;
+}
+function enterMarmont(s){
+ s=step(s,"GO","hotel");
+ assert.equal(s.room,"hotelAnnex");
+ s=step(s,"TALK","ruth");
+ s=chooseRuth(s,"show");
+ assert.equal(s.case12.recordsAccess,true);
+ s=chooseRuth(s,"close");
+ return s;
+}
+function collectHotel(s){
+ s=enterMarmont(s);
+ s=step(s,"OPEN","drawer");
+ s=step(s,"TAKE","card");
+ s=step(s,"TAKE","bell");
+ s=step(s,"TAKE","switchboard");
+ s=step(s,"OPEN","till");
+ s=step(s,"TAKE","receipt");
+ assert.ok(s.inventory.includes("mercer-registration"));
+ assert.ok(s.inventory.includes("morrow-cafe-receipt"));
+ s=step(s,"GO","return");
+ return s;
+}
+function collectCoroner(s){
+ s=step(s,"GO","coroner");
+ assert.equal(s.room,"coronerOffice");
+ s=step(s,"OPEN","cabinet");
+ s=step(s,"TAKE","docket");
+ s=step(s,"TAKE","seal");
+ assert.ok(s.inventory.includes("mercer-death-docket"));
+ assert.ok(s.inventory.includes("mercer-id-seal"));
+ s=step(s,"GO","return");
+ return s;
+}
+function collectStreet(s){
+ s=step(s,"TALK","eleanor");
+ s=step(s,"OPEN","envelope");
+ s=step(s,"TAKE","streetFrame");
+ assert.ok(s.inventory.includes("street-negative"));
+ return s;
+}
+function reachAlibiBoard(prior="all"){
+ let s=collectStreet(reachAlibi(prior));
+ s=collectHotel(s);
+ s=collectCoroner(s);
+ s=step(s,"GO","boardroom");
+ assert.equal(s.room,"reconstructionDesk");
+ s=step(s,"OPEN","board");
+ assert.equal(s.case12.boardOpen,true);
+ return s;
+}
+test("Chapter 12 carries all eleven completed chapters and rescue choices intact",()=>{
+ const all=reachAlibi("all"),quiet=reachAlibi("quiet");
+ assert.equal(all.case12.priorDecision,"all");
+ assert.equal(quiet.case12.priorDecision,"quiet");
+ assert.equal(all.case12.ruthTrust,1);
+ assert.equal(quiet.case12.ruthTrust,-1);
+ assert.equal(all.case11.decision,"all");
+ assert.equal(quiet.case11.decision,"quiet");
+ assert.equal(all.case11.eleanorMet,true);
+ assert.equal(all.case10.decision,"divert");
+ assert.equal(all.case3.boardSolved,true);
+ assert.ok(all.inventory.includes("eleanor-testimony"));
+ assert.equal(continueAlibiCase(all).room,"safehouse","chapter transition cannot be replayed");
+});
+test("Eleanor preserves original street-facing negative independently of room 214 footage",()=>{
+ let s=reachAlibi();
+ assert.equal(visibleTargets(s).some(([id])=>id==="streetFrame"),false);
+ s=step(s,"TAKE","streetFrame");
+ assert.ok(!s.inventory.includes("street-negative"));
+ s=collectStreet(s);
+ assert.ok(s.clues.includes("eleanor-alibi-help"));
+ assert.ok(s.clues.includes("street-time"));
+ assert.equal(visibleTargets(s).some(([id])=>id==="streetFrame"),false);
+});
+test("Ruth requires signed testimony to release original hotel records, with trust recovery",()=>{
+ let s=step(reachAlibi("quiet"),"GO","hotel");
+ s=step(s,"OPEN","drawer");
+ assert.equal(s.case12.drawerOpen,false);
+ s=step(s,"TALK","ruth");
+ assert.equal(RUTH_OPTIONS.length,5);
+ s=chooseRuth(s,"accuse");
+ assert.equal(s.case12.ruthTrust,-3);
+ s=chooseRuth(s,"timing");
+ assert.ok(s.clues.includes("ruth-time"));
+ s=chooseRuth(s,"protect");
+ assert.equal(s.case12.ruthTrust,-1);
+ s=chooseRuth(s,"show");
+ assert.equal(s.case12.ruthTrust,0);
+ assert.equal(s.case12.recordsAccess,true);
+ assert.ok(s.inventory.includes("ruth-record-key"));
+ const n=s.inventory.length;
+ s=chooseRuth(s,"show");
+ assert.equal(s.inventory.length,n);
+ s=chooseRuth(s,"close");
+ s=step(s,"OPEN","drawer");
+ assert.equal(s.case12.drawerOpen,true);
+});
+test("Hotel registration, bell card, pulse roll and café receipt have independent collection gates",()=>{
+ let s=enterMarmont(reachAlibi());
+ assert.equal(visibleTargets(s).some(([id])=>id==="card"),false);
+ s=step(s,"TAKE","card");
+ assert.ok(!s.inventory.includes("mercer-registration"));
+ s=step(s,"OPEN","drawer");
+ s=step(s,"TAKE","card");
+ s=step(s,"TAKE","bell");
+ s=step(s,"TAKE","switchboard");
+ assert.ok(s.clues.includes("bellhop-shot"));
+ assert.ok(s.clues.includes("hotel-pulse"));
+ assert.equal(visibleTargets(s).some(([id])=>id==="receipt"),false);
+ s=step(s,"OPEN","till");
+ s=step(s,"TAKE","receipt");
+ assert.ok(s.inventory.includes("morrow-cafe-receipt"));
+});
+test("Coroner's independent seal and docket identify victim as Mercer without naming shooter",()=>{
+ let s=step(reachAlibi(),"GO","coroner");
+ s=step(s,"TAKE","docket");
+ assert.ok(!s.inventory.includes("mercer-death-docket"));
+ s=step(s,"OPEN","cabinet");
+ s=step(s,"TAKE","docket");
+ s=step(s,"TAKE","seal");
+ s=step(s,"LOOK","telegram");
+ assert.ok(s.clues.includes("mercer-victim"));
+ assert.ok(s.clues.includes("mercer-identity-confirmed"));
+ assert.ok(s.clues.includes("autopsy-caution"));
+ assert.ok(s.transcript.some(x=>x.text.includes("Daniel Mercer")));
+});
+test("Three evidence-board links require independent original pairs, not guesses",()=>{
+ let s=step(reachAlibi(),"GO","boardroom");
+ s=step(s,"OPEN","board");
+ assert.equal(ALIBI_LINKS.length,4);
+ s=chooseAlibiLink(s,"identity");
+ s=chooseAlibiLink(s,"shot");
+ s=chooseAlibiLink(s,"alibi");
+ assert.deepEqual(s.case12.links,[]);
+ s=step(s,"GO","door");
+ s=collectStreet(s);
+ s=collectHotel(s);
+ s=collectCoroner(s);
+ s=step(s,"GO","boardroom");
+ s=step(s,"OPEN","board");
+ for(const id of ["identity","shot","alibi"])s=chooseAlibiLink(s,id);
+ assert.deepEqual(s.case12.links,["identity","shot","alibi"]);
+ assert.equal(s.case12.boardSolved,true);
+ assert.ok(s.clues.includes("alibi-identity"));
+ assert.ok(s.clues.includes("alibi-shot"));
+ assert.ok(s.clues.includes("alibi-alibi"));
+});
+test("A completed board produces a defensible attestation and restored memory",()=>{
+ let s=reachAlibiBoard();
+ for(const id of ["identity","shot","alibi"])s=chooseAlibiLink(s,id);
+ assert.equal(visibleTargets(s).some(([id])=>id==="attestation"),true);
+ s=step(s,"TAKE","attestation");
+ assert.ok(s.inventory.includes("vincent-alibi"));
+ assert.ok(s.clues.includes("morrow-cleared-of-shot"));
+ assert.ok(s.memories.includes("mercer-memory"));
+ assert.equal(visibleTargets(s).some(([id])=>id==="attestation"),false);
+});
+test("Last Alibi finale requires original attestation and preserves file vs hold choice",()=>{
+ let s=reachAlibiBoard("quiet");
+ for(const id of ["identity","shot","alibi"])s=chooseAlibiLink(s,id);
+ s=step(s,"TALK","telephone");
+ assert.equal(s.case12.endPanel,false,"must secure original alibi first");
+ s=step(s,"TAKE","attestation");
+ s=step(s,"TALK","telephone");
+ assert.equal(s.case12.endPanel,true);
+ assert.equal(ALIBI_ENDINGS.length,3);
+ const back=chooseAlibiEnding(s,"back");
+ assert.equal(back.case12.endPanel,false);
+ const filed=chooseAlibiEnding(s,"file"),sealed=chooseAlibiEnding(s,"hold");
+ assert.equal(filed.status,"chapter12complete");
+ assert.equal(sealed.status,"chapter12complete");
+ assert.equal(filed.case12.decision,"file");
+ assert.equal(sealed.case12.decision,"hold");
+ assert.ok(filed.clues.includes("alibi-filed"));
+ assert.ok(sealed.clues.includes("alibi-sealed"));
+ assert.deepEqual(filed.inventory,sealed.inventory);
+ assert.ok(filed.transcript.some(x=>x.text.includes("NEXT: THE MASKED PATRON")));
+ assert.equal(step(filed,"GO","door").status,"chapter12complete");
+});
+test("Save v12 retains legacy cases and partially reconstructed alibi",()=>{
+ let s=reachAlibiBoard("quiet");
+ s=chooseAlibiLink(s,"identity");
+ const saved=validateSave(JSON.parse(JSON.stringify(s)));
+ assert.equal(saved.version,SAVE_VERSION);
+ assert.equal(saved.chapter,12);
+ assert.deepEqual(saved.case12.links,["identity"]);
+ assert.equal(saved.case12.boardOpen,true);
+ assert.equal(saved.case11.decision,"quiet");
+ assert.equal(saved.case10.decision,"divert");
+ assert.equal(saved.case9.decision,"shield");
+ assert.equal(saved.case3.boardSolved,true);
+ assert.ok(saved.inventory.includes("mercer-death-docket"));
+ for(let version=1;version<=11;version++){
+  const old={...initialState(),version};
+  delete old.case12;
+  const restored=validateSave(old);
+  assert.equal(restored.version,SAVE_VERSION);
+  assert.equal(restored.chapter,1);
+ }
+});
+test("Corrupt v12 save state is normalized, including fake findings and hostile dialogue",()=>{
+ let s=reachAlibiBoard();
+ s.case12.ruthTrust=999;
+ s.case12.ruthAsked=["bad","accuse","show","accuse"];
+ s.case12.links=["shot","injected","shot","identity"];
+ s.case12.boardSolved=true;
+ s.case12.dialogue="proto";
+ s.case12.decision="injected";
+ const v=validateSave(s);
+ assert.equal(v.case12.ruthTrust,3);
+ assert.deepEqual(v.case12.ruthAsked,["accuse","show"]);
+ assert.deepEqual(v.case12.links,["shot","identity"]);
+ assert.equal(v.case12.boardSolved,false);
+ assert.equal(v.case12.reportTaken,false);
+ assert.equal(v.case12.dialogue,null);
+ assert.equal(v.case12.decision,"");
+});
+
+test("twelve-chapter save roundtrip does not truncate mature evidence or discovered rooms",()=>{
+ let s=reachAlibiBoard();
+ assert.ok(s.inventory.length>50,"the real cross-chapter inventory must exceed the old 50-item cap");
+ assert.ok(s.clues.length>80,"the long case should exceed the old notebook cap");
+ const saved=validateSave(JSON.parse(JSON.stringify(s)));
+ assert.deepEqual(saved.inventory,s.inventory);
+ assert.deepEqual(saved.clues,s.clues);
+ assert.deepEqual(saved.memories,s.memories);
+ assert.deepEqual(saved.discovered,s.discovered);
+ assert.ok(saved.inventory.includes("mercer-death-docket"));
+ assert.ok(saved.inventory.includes("morrow-cafe-receipt"));
+ assert.ok(saved.clues.includes("mercer-identity-confirmed"));
+});
+test("save normalization deduplicates IDs and ignores overlong malicious identifiers",()=>{
+ const s=reachAlibi();
+ s.inventory.push("street-negative","street-negative","x".repeat(1000));
+ s.clues.push("alibi-repeated","alibi-repeated","z".repeat(1024));
+ const v=validateSave(s);
+ assert.equal(v.inventory.filter(x=>x==="street-negative").length,1);
+ assert.equal(v.clues.filter(x=>x==="alibi-repeated").length,1);
+ assert.ok(v.inventory.every(x=>x.length<=128));
+ assert.ok(v.clues.every(x=>x.length<=128));
 });

@@ -3,6 +3,32 @@
 
 A retro-first, VR-bound 1947 Chicago noir mystery starring private investigator **Vincent Morrow**.
 
+## Rung 12: The Last Alibi (v1.2.0)
+
+**Twelve playable detective chapters.** After freeing Eleanor at Lantern House, click **CONTINUE TO CHAPTER 12: THE LAST ALIBI**. Vincent and Eleanor turn the original room-214 crime scene into a solvable forensic investigation. All older clues, memories and choices are preserved.
+
+### Back to the original murder
+- Four new original procedural 320×200 pixel-art rooms: **Eleanor's safehouse**, **Marmont records annex**, **municipal coroner annex**, and the **three-column reconstruction room**.
+- Chapter 11's **ALL witnesses / QUIET escape** decision changes the initial trust of **Ruth Calder**, a former Marmont night clerk who kept hotel records. Showing Eleanor's genuine signed testimony gains access even after harsh questioning.
+- Eleanor reveals a second, uncut **street-facing camera negative** showing Vincent at a café entrance at **2:06 A.M.** This is independent from the hotel's preinstalled camera.
+- In the surviving hotel records annex, recover the original guest registration, bellhop incident card, switchboard pulse roll, and Vincent's signed café receipt. In the coroner's annex, recover the independently verified identity seal and intake docket.
+- The original room-214 victim is identified as **Daniel Mercer**, a financial audit consultant. Independent bellhop and switchboard originals date the shot to 2:06 A.M. The original street frame and café receipt put Vincent outside at the same time, so he did not physically fire the shot in room 214. This is a **corroborated alibi**, not proof of the shooter's identity or innocence of every possible offense.
+- New evidence-board challenge: corroborate **WHO DIED / WHEN THE SHOT OCCURRED / WHERE VINCENT WAS** with different original-source pairs. Unlike the earlier numerical locks, it cannot be completed with unsupported guesses; findings may be made in any order. Reopen and continue at any time.
+- Recover the signed **alibi reconstruction** and **Memory Fragment 12**. Choose whether to **file the alibi with police** or **hold the original privately** while seeking the killer. Both choices save different consequences for the future Chapter 13, **The Masked Patron**. The true Kingfisher and the shooter remain unidentified.
+
+### Chapter 12 play path
+1. At Eleanor's safehouse, TALK to her, OPEN the sealed camera envelope, and TAKE the street-facing original.
+2. GO to the Marmont records annex. TALK to Ruth and SHOW Eleanor's original signed testimony to obtain access. OPEN the guest-register drawer and effects till; TAKE the room registration, bellhop incident card, switchboard roll, and café receipt.
+3. GO to the coroner annex, OPEN the intake cabinet, TAKE Daniel Mercer's original death docket and identification seal. Remember that the coroner's *intake time* is not a time of death.
+4. GO to the reconstruction room, OPEN the evidence board. Verify identity, shot time, and alibi from the independent original documents.
+5. TAKE the original report, TALK to the police liaison telephone, and choose whether to file or keep the attestation.
+
+### Compatibility and limitations
+- Game rules and original Canvas scenes live in separate `src/chapter12.js` and `src/chapter12-art.js`; the old six verbs and keyboard 1–6 continue with accessible object lists and button panels.
+- **Versioned saves v12** import **v1–v11**, preserving earlier chapter snapshots, character decisions, evidence, and the original local-storage key. Browser auto-save and JSON export/import remain local-first.
+- The offline PWA cache advances to `blackout-the-last-alibi-v12`, including the new engine and art. No new runtime package, third-party assets, user account or backend.
+- Still browser-first: Quest 3 XR, multiplayer, production audio and Chapter 13 are **not implemented** in this PR. Browser and mobile manual testing remains necessary after merge.
+
 ## Rung 11: Lantern House (v1.1.0)
 
 **Eleanor is found alive.** The eleven-chapter detective story now has a playable rescue rather than another distant lead. After finishing North Canal, select **CONTINUE TO CHAPTER 11: LANTERN HOUSE** in the Case Controls. Your prior clues, character relationships and original evidence remain in the same save.
@@ -337,6 +363,8 @@ BLACKOUT began in November 2025 as a first-person noir investigation inspired by
 | `src/chapter10-art.js` | Original towpath, hut, barge and transmission control scenes |
 | `src/chapter11.js` | Ada Reed, evidence-based evacuation plan, Eleanor reunion and branching rescue |
 | `src/chapter11-art.js` | Original Lantern House landing, greenhouse, security office and observation ward scenes |
+| `src/chapter12.js` | Ruth interview, original hotel and coroner evidence, alibi board and decisions |
+| `src/chapter12-art.js` | Safehouse, Marmont annex, coroner files and reconstruction board pixel scenes |
 | `sw.js` | Offline app shell |
 | `test/engine.test.mjs` | Native Node tests |
 | `.github/workflows/test.yml` | CI on PRs and pushes |
